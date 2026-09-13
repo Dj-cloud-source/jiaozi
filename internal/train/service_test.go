@@ -10,6 +10,7 @@ import (
 
 type fakeRepository struct {
 	params CreateTrainParams
+	train  model.Train
 	err    error
 }
 
@@ -34,6 +35,15 @@ func (r *fakeRepository) Create(ctx context.Context, params CreateTrainParams) (
 		SecondClassSeatCount: params.SecondClassSeatCount,
 		Status:               "DRAFT",
 	}, nil
+}
+
+func (r *fakeRepository) Publish(ctx context.Context, trainID uint64) (model.Train, error) {
+	if r.err != nil {
+		return model.Train{}, r.err
+	}
+	r.train.ID = trainID
+	r.train.Status = "WAITING_SALE"
+	return r.train, nil
 }
 
 func TestCreateTrainCreatesDraft(t *testing.T) {
@@ -109,6 +119,33 @@ func TestCreateTrainRejectsInvalidPrice(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Create(context.Background(), req)
 	if !errors.Is(err, ErrInvalidTrain) {
 		t.Fatalf("expected invalid train error, got %v", err)
+	}
+}
+
+func TestPublishTrainReturnsWaitingSale(t *testing.T) {
+	service := NewService(&fakeRepository{
+		train: model.Train{
+			TrainNo: "G101",
+		},
+	})
+
+	train, err := service.Publish(context.Background(), 10001)
+	if err != nil {
+		t.Fatalf("publish train failed: %v", err)
+	}
+
+	if train.ID != 10001 {
+		t.Fatalf("unexpected train id: %d", train.ID)
+	}
+	if train.Status != "WAITING_SALE" {
+		t.Fatalf("unexpected train status: %s", train.Status)
+	}
+}
+
+func TestPublishTrainRejectsZeroID(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).Publish(context.Background(), 0)
+	if !errors.Is(err, ErrTrainNotFound) {
+		t.Fatalf("expected train not found error, got %v", err)
 	}
 }
 

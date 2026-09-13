@@ -14,6 +14,7 @@ var pricePattern = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 
 type repository interface {
 	Create(ctx context.Context, params CreateTrainParams) (model.Train, error)
+	Publish(ctx context.Context, trainID uint64) (model.Train, error)
 }
 
 type Service struct {
@@ -45,6 +46,14 @@ func (s *Service) Create(ctx context.Context, req CreateTrainRequest) (model.Tra
 	}
 
 	return s.repository.Create(ctx, params)
+}
+
+func (s *Service) Publish(ctx context.Context, trainID uint64) (model.Train, error) {
+	if trainID == 0 {
+		return model.Train{}, ErrTrainNotFound
+	}
+
+	return s.repository.Publish(ctx, trainID)
 }
 
 func buildCreateTrainParams(req CreateTrainRequest) (CreateTrainParams, error) {
