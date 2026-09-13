@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"jiaozi/internal/model"
 )
@@ -12,6 +13,7 @@ type fakeRepository struct {
 	params CreateTrainParams
 	train  model.Train
 	trains []TrainView
+	opened int64
 	err    error
 }
 
@@ -63,6 +65,13 @@ func (r *fakeRepository) FindViewByID(ctx context.Context, trainID uint64) (Trai
 	}
 	r.trains[0].ID = trainID
 	return r.trains[0], nil
+}
+
+func (r *fakeRepository) OpenDueTrains(ctx context.Context, now time.Time) (int64, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
+	return r.opened, nil
 }
 
 func TestCreateTrainCreatesDraft(t *testing.T) {
@@ -205,6 +214,18 @@ func TestDetailRejectsZeroID(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Detail(context.Background(), 0)
 	if !errors.Is(err, ErrTrainNotFound) {
 		t.Fatalf("expected train not found error, got %v", err)
+	}
+}
+
+func TestOpenDueTrainsReturnsAffectedRows(t *testing.T) {
+	service := NewService(&fakeRepository{opened: 2})
+
+	opened, err := service.OpenDueTrains(context.Background(), time.Now())
+	if err != nil {
+		t.Fatalf("open due trains failed: %v", err)
+	}
+	if opened != 2 {
+		t.Fatalf("expected 2 opened trains, got %d", opened)
 	}
 }
 

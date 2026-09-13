@@ -313,3 +313,21 @@ func orderBySQL(sort string) string {
 		return ` ORDER BY t.departure_time ASC`
 	}
 }
+
+func (r *Repository) OpenDueTrains(ctx context.Context, now time.Time) (int64, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE trains
+		 SET status = ?
+		 WHERE status = ?
+		   AND sale_start_time <= ?`,
+		"ON_SALE",
+		"WAITING_SALE",
+		now,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

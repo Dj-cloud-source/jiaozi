@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
+	"time"
 
 	"jiaozi/internal/auth"
 	"jiaozi/internal/config"
 	"jiaozi/internal/httpserver"
 	"jiaozi/internal/platform/database"
+	"jiaozi/internal/scheduler"
 	"jiaozi/internal/station"
 	"jiaozi/internal/train"
 	"jiaozi/internal/user"
@@ -38,6 +41,12 @@ func main() {
 	trainRepository := train.NewRepository(db)
 	trainService := train.NewService(trainRepository)
 	trainHandler := train.NewHandler(trainService)
+
+	trainSaleScheduler := scheduler.NewTrainSaleScheduler(
+		trainService,
+		time.Duration(cfg.Scheduler.TrainSaleIntervalSeconds)*time.Second,
+	)
+	trainSaleScheduler.Start(context.Background())
 
 	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler)
 

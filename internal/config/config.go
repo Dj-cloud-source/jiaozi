@@ -3,9 +3,10 @@ package config
 import "os"
 
 type Config struct {
-	Server ServerConfig
-	MySQL  MySQLConfig
-	Auth   AuthConfig
+	Server    ServerConfig
+	MySQL     MySQLConfig
+	Auth      AuthConfig
+	Scheduler SchedulerConfig
 }
 
 type ServerConfig struct {
@@ -26,6 +27,10 @@ type AuthConfig struct {
 	TokenExpireSeconds int64
 }
 
+type SchedulerConfig struct {
+	TrainSaleIntervalSeconds int64
+}
+
 func Load() Config {
 	return Config{
 		Server: ServerConfig{
@@ -42,6 +47,9 @@ func Load() Config {
 		Auth: AuthConfig{
 			TokenSecret:        env("AUTH_TOKEN_SECRET", "dev-secret"),
 			TokenExpireSeconds: 604800,
+		},
+		Scheduler: SchedulerConfig{
+			TrainSaleIntervalSeconds: 30,
 		},
 	}
 }
