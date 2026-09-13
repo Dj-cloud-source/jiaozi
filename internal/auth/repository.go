@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/go-sql-driver/mysql"
@@ -22,6 +23,24 @@ type CreateUserParams struct {
 
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) FindUserByPhone(ctx context.Context, phone string) (model.User, error) {
+	var user model.User
+	err := r.db.GetContext(
+		ctx,
+		&user,
+		`SELECT id, phone, password_hash, nickname, created_at, updated_at FROM users WHERE phone = ?`,
+		phone,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.User{}, ErrInvalidPhoneOrPassword
+		}
+		return model.User{}, err
+	}
+
+	return user, nil
 }
 
 func (r *Repository) CreateUser(ctx context.Context, params CreateUserParams) (model.User, error) {

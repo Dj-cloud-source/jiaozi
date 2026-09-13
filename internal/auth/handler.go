@@ -43,3 +43,26 @@ func (h *Handler) Register(c *gin.Context) {
 		Nickname: user.Nickname,
 	}))
 }
+
+func (h *Handler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		return
+	}
+
+	response, err := h.service.Login(c.Request.Context(), req)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidLoginRequest):
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		case errors.Is(err, ErrInvalidPhoneOrPassword):
+			c.JSON(http.StatusUnauthorized, httpserver.Error(41002, "invalid phone or password"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(response))
+}

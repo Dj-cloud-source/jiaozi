@@ -5,6 +5,7 @@ import "os"
 type Config struct {
 	Server ServerConfig
 	MySQL  MySQLConfig
+	Auth   AuthConfig
 }
 
 type ServerConfig struct {
@@ -20,6 +21,11 @@ type MySQLConfig struct {
 	Password string
 }
 
+type AuthConfig struct {
+	TokenSecret        string
+	TokenExpireSeconds int64
+}
+
 func Load() Config {
 	return Config{
 		Server: ServerConfig{
@@ -32,6 +38,10 @@ func Load() Config {
 			Database: env("MYSQL_DATABASE", "jiaozi"),
 			Username: env("MYSQL_USERNAME", "root"),
 			Password: env("MYSQL_PASSWORD", ""),
+		},
+		Auth: AuthConfig{
+			TokenSecret:        env("AUTH_TOKEN_SECRET", "dev-secret"),
+			TokenExpireSeconds: 604800,
 		},
 	}
 }

@@ -11,14 +11,16 @@ import (
 
 type userRepository interface {
 	CreateUser(ctx context.Context, params CreateUserParams) (model.User, error)
+	FindUserByPhone(ctx context.Context, phone string) (model.User, error)
 }
 
 type Service struct {
 	repository userRepository
+	tokens     *TokenManager
 }
 
-func NewService(repository userRepository) *Service {
-	return &Service{repository: repository}
+func NewService(repository userRepository, tokens *TokenManager) *Service {
+	return &Service{repository: repository, tokens: tokens}
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (model.User, error) {
@@ -40,4 +42,36 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (model.User
 		PasswordHash: string(passwordHash),
 		Nickname:     nickname,
 	})
+}
+
+func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {
+	phone := strings.TrimSpace(req.Phone)
+	password := strings.TrimSpace(req.Password)
+	if phone == "" || password == "" {
+		return LoginResponse{}, ErrInvalidLoginRequest
+	}
+
+	user, err := s.repository.FindUserByPhone(ctx, phone)
+	if err != nil {
+		return LoginResponse{}, err
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return LoginResponse{}, ErrInvalidPhoneOrPassword
+	}
+
+	token, err := s.tokens.Issue(user.ID)
+	if err != nil {
+		return LoginResponse{}, err
+	}
+
+	return LoginResponse{
+		AccessToken: token,
+		ExpiresIn:   s.tokens.ExpiresIn(),
+		User: LoginUserData{
+			ID:       user.ID,
+			Phone:    user.Phone,
+			Nickname: user.Nickname,
+		},
+	}, nil
 }

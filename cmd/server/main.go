@@ -7,6 +7,7 @@ import (
 	"jiaozi/internal/config"
 	"jiaozi/internal/httpserver"
 	"jiaozi/internal/platform/database"
+	"jiaozi/internal/user"
 )
 
 func main() {
@@ -19,10 +20,16 @@ func main() {
 	defer db.Close()
 
 	authRepository := auth.NewRepository(db)
-	authService := auth.NewService(authRepository)
+	tokenManager := auth.NewTokenManager(cfg.Auth.TokenSecret, cfg.Auth.TokenExpireSeconds)
+	authService := auth.NewService(authRepository, tokenManager)
 	authHandler := auth.NewHandler(authService)
+	authMiddleware := auth.NewMiddleware(tokenManager)
 
-	router := httpserver.NewRouter(authHandler)
+	userRepository := user.NewRepository(db)
+	userService := user.NewService(userRepository)
+	userHandler := user.NewHandler(userService)
+
+	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())
 	if err := router.Run(cfg.ServerAddress()); err != nil {
