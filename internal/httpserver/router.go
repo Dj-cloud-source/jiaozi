@@ -17,6 +17,7 @@ type UserHandler interface {
 
 type StationHandler interface {
 	ListActive(*gin.Context)
+	Create(*gin.Context)
 }
 
 func NewRouter(
@@ -35,6 +36,9 @@ func NewRouter(
 	api.POST("/auth/register", authHandler.Register)
 	api.POST("/auth/login", authHandler.Login)
 	api.GET("/stations", stationHandler.ListActive)
+
+	admin := api.Group("/admin")
+	admin.POST("/stations", stationHandler.Create)
 
 	users := api.Group("/users")
 	users.Use(authMiddleware)

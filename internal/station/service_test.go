@@ -2,6 +2,7 @@ package station
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"jiaozi/internal/model"
@@ -9,10 +10,20 @@ import (
 
 type fakeRepository struct {
 	stations []model.Station
+	created  model.Station
+	createErr error
 }
 
 func (r *fakeRepository) ListActive(ctx context.Context) ([]model.Station, error) {
 	return r.stations, nil
+}
+
+func (r *fakeRepository) Create(ctx context.Context, name string) (model.Station, error) {
+	if r.createErr != nil {
+		return model.Station{}, r.createErr
+	}
+	r.created = model.Station{ID: 10001, Name: name, Status: "ACTIVE"}
+	return r.created, nil
 }
 
 func TestListActiveReturnsStations(t *testing.T) {
@@ -33,5 +44,35 @@ func TestListActiveReturnsStations(t *testing.T) {
 	}
 	if stations[0].Name != "南京南" {
 		t.Fatalf("unexpected first station: %s", stations[0].Name)
+	}
+}
+
+func TestCreateStationTrimsName(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(repository)
+
+	station, err := service.Create(context.Background(), CreateStationRequest{
+		Name: " 南京南 ",
+	})
+	if err != nil {
+		t.Fatalf("create station failed: %v", err)
+	}
+
+	if station.Name != "南京南" {
+		t.Fatalf("unexpected station name: %s", station.Name)
+	}
+	if station.Status != "ACTIVE" {
+		t.Fatalf("unexpected station status: %s", station.Status)
+	}
+}
+
+func TestCreateStationRejectsEmptyName(t *testing.T) {
+	service := NewService(&fakeRepository{})
+
+	_, err := service.Create(context.Background(), CreateStationRequest{
+		Name: " ",
+	})
+	if !errors.Is(err, ErrInvalidStationName) {
+		t.Fatalf("expected invalid station name error, got %v", err)
 	}
 }
