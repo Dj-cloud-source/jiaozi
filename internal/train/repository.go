@@ -349,3 +349,21 @@ func (r *Repository) StopDueTrains(ctx context.Context, now time.Time) (int64, e
 
 	return result.RowsAffected()
 }
+
+func (r *Repository) DepartDueTrains(ctx context.Context, now time.Time) (int64, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE trains
+		 SET status = ?
+		 WHERE status = ?
+		   AND departure_time <= ?`,
+		"DEPARTED",
+		"STOPPED",
+		now,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

@@ -19,6 +19,7 @@ type repository interface {
 	FindViewByID(ctx context.Context, trainID uint64) (TrainView, error)
 	OpenDueTrains(ctx context.Context, now time.Time) (int64, error)
 	StopDueTrains(ctx context.Context, now time.Time) (int64, error)
+	DepartDueTrains(ctx context.Context, now time.Time) (int64, error)
 }
 
 type Service struct {
@@ -83,6 +84,10 @@ func (s *Service) OpenDueTrains(ctx context.Context, now time.Time) (int64, erro
 
 func (s *Service) StopDueTrains(ctx context.Context, now time.Time) (int64, error) {
 	return s.repository.StopDueTrains(ctx, now)
+}
+
+func (s *Service) DepartDueTrains(ctx context.Context, now time.Time) (int64, error) {
+	return s.repository.DepartDueTrains(ctx, now)
 }
 
 func buildCreateTrainParams(req CreateTrainRequest) (CreateTrainParams, error) {

@@ -42,6 +42,7 @@ func (s *TrainStatusScheduler) updateTrainStatus(ctx context.Context) {
 	now := time.Now()
 	s.openDueTrains(ctx, now)
 	s.stopDueTrains(ctx, now)
+	s.departDueTrains(ctx, now)
 }
 
 func (s *TrainStatusScheduler) openDueTrains(ctx context.Context, now time.Time) {
@@ -63,5 +64,16 @@ func (s *TrainStatusScheduler) stopDueTrains(ctx context.Context, now time.Time)
 	}
 	if stopped > 0 {
 		log.Printf("stopped due trains: %d", stopped)
+	}
+}
+
+func (s *TrainStatusScheduler) departDueTrains(ctx context.Context, now time.Time) {
+	departed, err := s.service.DepartDueTrains(ctx, now)
+	if err != nil {
+		log.Printf("depart due trains failed: %v", err)
+		return
+	}
+	if departed > 0 {
+		log.Printf("departed due trains: %d", departed)
 	}
 }
