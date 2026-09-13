@@ -9,6 +9,8 @@ import (
 type fakeRepository struct {
 	seatNos []uint64
 	locked  int64
+	released int64
+	sold     int64
 }
 
 func (r *fakeRepository) ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error) {
@@ -17,6 +19,14 @@ func (r *fakeRepository) ListAvailableSeatNos(ctx context.Context, trainID uint6
 
 func (r *fakeRepository) LockSeats(ctx context.Context, params LockSeatsParams) (int64, error) {
 	return r.locked, nil
+}
+
+func (r *fakeRepository) ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	return r.released, nil
+}
+
+func (r *fakeRepository) MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	return r.sold, nil
 }
 
 func TestListAvailableSeatNosReturnsSeatNos(t *testing.T) {
@@ -59,5 +69,47 @@ func TestLockSeatsRejectsInvalidParams(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidSeatLock) {
 		t.Fatalf("expected invalid seat lock error, got %v", err)
+	}
+}
+
+func TestReleaseSeatsReturnsAffectedRows(t *testing.T) {
+	service := NewService(&fakeRepository{released: 2})
+
+	released, err := service.ReleaseSeats(context.Background(), OrderSeatActionParams{
+		OrderID: "order-001",
+	})
+	if err != nil {
+		t.Fatalf("release seats failed: %v", err)
+	}
+	if released != 2 {
+		t.Fatalf("expected 2 released seats, got %d", released)
+	}
+}
+
+func TestMarkSeatsSoldReturnsAffectedRows(t *testing.T) {
+	service := NewService(&fakeRepository{sold: 2})
+
+	sold, err := service.MarkSeatsSold(context.Background(), OrderSeatActionParams{
+		OrderID: "order-001",
+	})
+	if err != nil {
+		t.Fatalf("mark seats sold failed: %v", err)
+	}
+	if sold != 2 {
+		t.Fatalf("expected 2 sold seats, got %d", sold)
+	}
+}
+
+func TestOrderSeatActionsRejectEmptyOrderID(t *testing.T) {
+	service := NewService(&fakeRepository{})
+
+	_, err := service.ReleaseSeats(context.Background(), OrderSeatActionParams{})
+	if !errors.Is(err, ErrInvalidSeatAction) {
+		t.Fatalf("expected invalid seat action error, got %v", err)
+	}
+
+	_, err = service.MarkSeatsSold(context.Background(), OrderSeatActionParams{})
+	if !errors.Is(err, ErrInvalidSeatAction) {
+		t.Fatalf("expected invalid seat action error, got %v", err)
 	}
 }

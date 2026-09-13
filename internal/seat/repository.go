@@ -66,3 +66,41 @@ func (r *Repository) LockSeats(ctx context.Context, params LockSeatsParams) (int
 
 	return result.RowsAffected()
 }
+
+func (r *Repository) ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE seats
+		 SET status = ?,
+		     locked_order_id = NULL,
+		     locked_at = NULL
+		 WHERE status = ?
+		   AND locked_order_id = ?`,
+		"AVAILABLE",
+		"LOCKED",
+		params.OrderID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
+func (r *Repository) MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE seats
+		 SET status = ?
+		 WHERE status = ?
+		   AND locked_order_id = ?`,
+		"SOLD",
+		"LOCKED",
+		params.OrderID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

@@ -5,6 +5,8 @@ import "context"
 type repository interface {
 	ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error)
 	LockSeats(ctx context.Context, params LockSeatsParams) (int64, error)
+	ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error)
+	MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error)
 }
 
 type Service struct {
@@ -25,4 +27,20 @@ func (s *Service) LockSeats(ctx context.Context, params LockSeatsParams) (int64,
 	}
 
 	return s.repository.LockSeats(ctx, params)
+}
+
+func (s *Service) ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	if params.OrderID == "" {
+		return 0, ErrInvalidSeatAction
+	}
+
+	return s.repository.ReleaseSeats(ctx, params)
+}
+
+func (s *Service) MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	if params.OrderID == "" {
+		return 0, ErrInvalidSeatAction
+	}
+
+	return s.repository.MarkSeatsSold(ctx, params)
 }
