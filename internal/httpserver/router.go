@@ -4,12 +4,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	"jiaozi/internal/auth"
-	"jiaozi/internal/user"
 )
 
-func NewRouter(authHandler *auth.Handler, authMiddleware gin.HandlerFunc, userHandler *user.Handler) *gin.Engine {
+type AuthHandler interface {
+	Register(*gin.Context)
+	Login(*gin.Context)
+}
+
+type UserHandler interface {
+	Me(*gin.Context)
+}
+
+func NewRouter(authHandler AuthHandler, authMiddleware gin.HandlerFunc, userHandler UserHandler) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
