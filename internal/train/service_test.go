@@ -14,6 +14,7 @@ type fakeRepository struct {
 	train  model.Train
 	trains []TrainView
 	opened int64
+	stopped int64
 	err    error
 }
 
@@ -72,6 +73,13 @@ func (r *fakeRepository) OpenDueTrains(ctx context.Context, now time.Time) (int6
 		return 0, r.err
 	}
 	return r.opened, nil
+}
+
+func (r *fakeRepository) StopDueTrains(ctx context.Context, now time.Time) (int64, error) {
+	if r.err != nil {
+		return 0, r.err
+	}
+	return r.stopped, nil
 }
 
 func TestCreateTrainCreatesDraft(t *testing.T) {
@@ -226,6 +234,18 @@ func TestOpenDueTrainsReturnsAffectedRows(t *testing.T) {
 	}
 	if opened != 2 {
 		t.Fatalf("expected 2 opened trains, got %d", opened)
+	}
+}
+
+func TestStopDueTrainsReturnsAffectedRows(t *testing.T) {
+	service := NewService(&fakeRepository{stopped: 3})
+
+	stopped, err := service.StopDueTrains(context.Background(), time.Now())
+	if err != nil {
+		t.Fatalf("stop due trains failed: %v", err)
+	}
+	if stopped != 3 {
+		t.Fatalf("expected 3 stopped trains, got %d", stopped)
 	}
 }
 

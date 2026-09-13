@@ -42,11 +42,11 @@ func main() {
 	trainService := train.NewService(trainRepository)
 	trainHandler := train.NewHandler(trainService)
 
-	trainSaleScheduler := scheduler.NewTrainSaleScheduler(
+	trainStatusScheduler := scheduler.NewTrainStatusScheduler(
 		trainService,
-		time.Duration(cfg.Scheduler.TrainSaleIntervalSeconds)*time.Second,
+		time.Duration(cfg.Scheduler.TrainStatusIntervalSeconds)*time.Second,
 	)
-	trainSaleScheduler.Start(context.Background())
+	trainStatusScheduler.Start(context.Background())
 
 	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler)
 
