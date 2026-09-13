@@ -20,11 +20,16 @@ type StationHandler interface {
 	Create(*gin.Context)
 }
 
+type TrainHandler interface {
+	Create(*gin.Context)
+}
+
 func NewRouter(
 	authHandler AuthHandler,
 	authMiddleware gin.HandlerFunc,
 	userHandler UserHandler,
 	stationHandler StationHandler,
+	trainHandler TrainHandler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
@@ -39,6 +44,7 @@ func NewRouter(
 
 	admin := api.Group("/admin")
 	admin.POST("/stations", stationHandler.Create)
+	admin.POST("/trains", trainHandler.Create)
 
 	users := api.Group("/users")
 	users.Use(authMiddleware)
