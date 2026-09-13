@@ -15,7 +15,16 @@ type UserHandler interface {
 	Me(*gin.Context)
 }
 
-func NewRouter(authHandler AuthHandler, authMiddleware gin.HandlerFunc, userHandler UserHandler) *gin.Engine {
+type StationHandler interface {
+	ListActive(*gin.Context)
+}
+
+func NewRouter(
+	authHandler AuthHandler,
+	authMiddleware gin.HandlerFunc,
+	userHandler UserHandler,
+	stationHandler StationHandler,
+) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
@@ -25,6 +34,7 @@ func NewRouter(authHandler AuthHandler, authMiddleware gin.HandlerFunc, userHand
 	api.GET("/health", health)
 	api.POST("/auth/register", authHandler.Register)
 	api.POST("/auth/login", authHandler.Login)
+	api.GET("/stations", stationHandler.ListActive)
 
 	users := api.Group("/users")
 	users.Use(authMiddleware)

@@ -7,6 +7,7 @@ import (
 	"jiaozi/internal/config"
 	"jiaozi/internal/httpserver"
 	"jiaozi/internal/platform/database"
+	"jiaozi/internal/station"
 	"jiaozi/internal/user"
 )
 
@@ -29,7 +30,11 @@ func main() {
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 
-	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler)
+	stationRepository := station.NewRepository(db)
+	stationService := station.NewService(stationRepository)
+	stationHandler := station.NewHandler(stationService)
+
+	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())
 	if err := router.Run(cfg.ServerAddress()); err != nil {
