@@ -13,3 +13,13 @@ type CreateTrainRequest struct {
 	FirstClassSeatCount  uint64 `json:"first_class_seat_count"`
 	SecondClassSeatCount uint64 `json:"second_class_seat_count"`
 }
+
+type ListTrainsRequest struct {
+	DepartureStationID uint64
+	ArrivalStationID   uint64
+	Date               string
+	TrainNo            string
+	Page               int
+	PageSize           int
+	Sort               string
+}

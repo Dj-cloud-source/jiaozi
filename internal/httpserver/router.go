@@ -23,6 +23,8 @@ type StationHandler interface {
 type TrainHandler interface {
 	Create(*gin.Context)
 	Publish(*gin.Context)
+	List(*gin.Context)
+	Detail(*gin.Context)
 }
 
 func NewRouter(
@@ -42,6 +44,8 @@ func NewRouter(
 	api.POST("/auth/register", authHandler.Register)
 	api.POST("/auth/login", authHandler.Login)
 	api.GET("/stations", stationHandler.ListActive)
+	api.GET("/trains", trainHandler.List)
+	api.GET("/trains/:train_id", trainHandler.Detail)
 
 	admin := api.Group("/admin")
 	admin.POST("/stations", stationHandler.Create)

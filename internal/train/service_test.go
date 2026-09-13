@@ -11,6 +11,7 @@ import (
 type fakeRepository struct {
 	params CreateTrainParams
 	train  model.Train
+	trains []TrainView
 	err    error
 }
 
@@ -44,6 +45,24 @@ func (r *fakeRepository) Publish(ctx context.Context, trainID uint64) (model.Tra
 	r.train.ID = trainID
 	r.train.Status = "WAITING_SALE"
 	return r.train, nil
+}
+
+func (r *fakeRepository) List(ctx context.Context, query ListTrainQuery) ([]TrainView, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.trains, nil
+}
+
+func (r *fakeRepository) FindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
+	if r.err != nil {
+		return TrainView{}, r.err
+	}
+	if len(r.trains) == 0 {
+		return TrainView{}, ErrTrainNotFound
+	}
+	r.trains[0].ID = trainID
+	return r.trains[0], nil
 }
 
 func TestCreateTrainCreatesDraft(t *testing.T) {
@@ -144,6 +163,46 @@ func TestPublishTrainReturnsWaitingSale(t *testing.T) {
 
 func TestPublishTrainRejectsZeroID(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Publish(context.Background(), 0)
+	if !errors.Is(err, ErrTrainNotFound) {
+		t.Fatalf("expected train not found error, got %v", err)
+	}
+}
+
+func TestListTrainsAcceptsRouteQuery(t *testing.T) {
+	service := NewService(&fakeRepository{
+		trains: []TrainView{
+			{ID: 10001, TrainNo: "G101", Status: "WAITING_SALE"},
+		},
+	})
+
+	trains, err := service.List(context.Background(), ListTrainsRequest{
+		DepartureStationID: 1,
+		ArrivalStationID:   2,
+		Date:               "2026-09-20",
+		Sort:               "time_asc",
+	})
+	if err != nil {
+		t.Fatalf("list trains failed: %v", err)
+	}
+	if len(trains) != 1 {
+		t.Fatalf("expected 1 train, got %d", len(trains))
+	}
+}
+
+func TestListTrainsRejectsInvalidSort(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).List(context.Background(), ListTrainsRequest{
+		DepartureStationID: 1,
+		ArrivalStationID:   2,
+		Date:               "2026-09-20",
+		Sort:               "bad_sort",
+	})
+	if !errors.Is(err, ErrInvalidTrain) {
+		t.Fatalf("expected invalid train error, got %v", err)
+	}
+}
+
+func TestDetailRejectsZeroID(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).Detail(context.Background(), 0)
 	if !errors.Is(err, ErrTrainNotFound) {
 		t.Fatalf("expected train not found error, got %v", err)
 	}

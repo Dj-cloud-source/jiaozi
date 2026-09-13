@@ -15,6 +15,8 @@ var pricePattern = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 type repository interface {
 	Create(ctx context.Context, params CreateTrainParams) (model.Train, error)
 	Publish(ctx context.Context, trainID uint64) (model.Train, error)
+	List(ctx context.Context, query ListTrainQuery) ([]TrainView, error)
+	FindViewByID(ctx context.Context, trainID uint64) (TrainView, error)
 }
 
 type Service struct {
@@ -54,6 +56,23 @@ func (s *Service) Publish(ctx context.Context, trainID uint64) (model.Train, err
 	}
 
 	return s.repository.Publish(ctx, trainID)
+}
+
+func (s *Service) List(ctx context.Context, req ListTrainsRequest) ([]TrainView, error) {
+	query, err := buildListTrainQuery(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.List(ctx, query)
+}
+
+func (s *Service) Detail(ctx context.Context, trainID uint64) (TrainView, error) {
+	if trainID == 0 {
+		return TrainView{}, ErrTrainNotFound
+	}
+
+	return s.repository.FindViewByID(ctx, trainID)
 }
 
 func buildCreateTrainParams(req CreateTrainRequest) (CreateTrainParams, error) {
@@ -135,4 +154,56 @@ func sameDate(expectedDate time.Time, value time.Time) bool {
 	year, month, day := value.Date()
 	expectedYear, expectedMonth, expectedDay := expectedDate.Date()
 	return year == expectedYear && month == expectedMonth && day == expectedDay
+}
+
+func buildListTrainQuery(req ListTrainsRequest) (ListTrainQuery, error) {
+	date, err := time.Parse("2006-01-02", strings.TrimSpace(req.Date))
+	if err != nil {
+		return ListTrainQuery{}, ErrInvalidTrain
+	}
+
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
+	sort := strings.TrimSpace(req.Sort)
+	if sort == "" {
+		sort = "time_asc"
+	}
+	if sort != "time_asc" && sort != "time_desc" && sort != "price_asc" && sort != "price_desc" {
+		return ListTrainQuery{}, ErrInvalidTrain
+	}
+
+	trainNo := strings.TrimSpace(req.TrainNo)
+	if trainNo != "" {
+		if !trainNoPattern.MatchString(trainNo) {
+			return ListTrainQuery{}, ErrInvalidTrain
+		}
+		return ListTrainQuery{
+			TrainNo:  trainNo,
+			Date:     date,
+			Page:     page,
+			PageSize: pageSize,
+			Sort:     sort,
+		}, nil
+	}
+
+	if req.DepartureStationID == 0 || req.ArrivalStationID == 0 || req.DepartureStationID == req.ArrivalStationID {
+		return ListTrainQuery{}, ErrInvalidTrain
+	}
+
+	return ListTrainQuery{
+		DepartureStationID: req.DepartureStationID,
+		ArrivalStationID:   req.ArrivalStationID,
+		Date:               date,
+		Page:               page,
+		PageSize:           pageSize,
+		Sort:               sort,
+	}, nil
 }

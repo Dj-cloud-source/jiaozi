@@ -215,3 +215,101 @@ func createSeats(ctx context.Context, tx *sqlx.Tx, trainID uint64, seatClass str
 
 	return nil
 }
+
+func (r *Repository) List(ctx context.Context, query ListTrainQuery) ([]TrainView, error) {
+	sqlQuery := trainViewSelectSQL()
+	args := []interface{}{}
+
+	if query.TrainNo != "" {
+		sqlQuery += ` WHERE t.train_no = ? AND t.departure_date = ?`
+		args = append(args, query.TrainNo, query.Date)
+	} else {
+		sqlQuery += ` WHERE t.departure_station_id = ? AND t.arrival_station_id = ? AND t.departure_date = ?`
+		args = append(args, query.DepartureStationID, query.ArrivalStationID, query.Date)
+	}
+
+	sqlQuery += ` AND t.status IN ('WAITING_SALE', 'ON_SALE', 'STOPPED')`
+	sqlQuery += trainViewGroupBySQL()
+	sqlQuery += orderBySQL(query.Sort)
+	sqlQuery += ` LIMIT ? OFFSET ?`
+	args = append(args, query.PageSize, (query.Page-1)*query.PageSize)
+
+	var trains []TrainView
+	err := r.db.SelectContext(ctx, &trains, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return trains, nil
+}
+
+func (r *Repository) FindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
+	var train TrainView
+	err := r.db.GetContext(
+		ctx,
+		&train,
+		trainViewSelectSQL()+` WHERE t.id = ? AND t.status IN ('WAITING_SALE', 'ON_SALE', 'STOPPED')`+trainViewGroupBySQL(),
+		trainID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return TrainView{}, ErrTrainNotFound
+		}
+		return TrainView{}, err
+	}
+
+	return train, nil
+}
+
+func trainViewSelectSQL() string {
+	return `SELECT
+		t.id,
+		t.train_no,
+		t.departure_date,
+		t.departure_station_id,
+		ds.name AS departure_station_name,
+		t.arrival_station_id,
+		asn.name AS arrival_station_name,
+		t.departure_time,
+		t.arrival_time,
+		t.sale_start_time,
+		COALESCE(CAST(t.first_class_price AS CHAR), '') AS first_class_price,
+		COALESCE(CAST(t.second_class_price AS CHAR), '') AS second_class_price,
+		SUM(CASE WHEN s.seat_class = 'FIRST_CLASS' AND s.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS first_class_available_count,
+		SUM(CASE WHEN s.seat_class = 'SECOND_CLASS' AND s.status = 'AVAILABLE' THEN 1 ELSE 0 END) AS second_class_available_count,
+		t.status
+	FROM trains t
+	JOIN stations ds ON ds.id = t.departure_station_id
+	JOIN stations asn ON asn.id = t.arrival_station_id
+	LEFT JOIN seats s ON s.train_id = t.id`
+}
+
+func trainViewGroupBySQL() string {
+	return ` GROUP BY
+		t.id,
+		t.train_no,
+		t.departure_date,
+		t.departure_station_id,
+		ds.name,
+		t.arrival_station_id,
+		asn.name,
+		t.departure_time,
+		t.arrival_time,
+		t.sale_start_time,
+		t.first_class_price,
+		t.second_class_price,
+		t.status`
+}
+
+func orderBySQL(sort string) string {
+	switch sort {
+	case "time_desc":
+		return ` ORDER BY t.departure_time DESC`
+	case "price_asc":
+		return ` ORDER BY LEAST(COALESCE(t.first_class_price, 99999999), COALESCE(t.second_class_price, 99999999)) ASC`
+	case "price_desc":
+		return ` ORDER BY LEAST(COALESCE(t.first_class_price, 99999999), COALESCE(t.second_class_price, 99999999)) DESC`
+	default:
+		return ` ORDER BY t.departure_time ASC`
+	}
+}
