@@ -28,13 +28,13 @@ func (h *Handler) Detail(c *gin.Context) {
 		return
 	}
 
-	paymentModel, err := h.service.Detail(c.Request.Context(), c.Param("payment_id"), userID)
+	result, err := h.service.Detail(c.Request.Context(), c.Param("payment_id"), userID)
 	if err != nil {
 		writePaymentError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, httpserver.Success(NewPaymentResponse(paymentModel)))
+	c.JSON(http.StatusOK, httpserver.Success(NewPaymentResponse(result)))
 }
 
 func (h *Handler) Pay(c *gin.Context) {
@@ -50,7 +50,7 @@ func (h *Handler) Pay(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, httpserver.Success(NewPaymentResponse(paymentModel)))
+	c.JSON(http.StatusOK, httpserver.Success(NewBasicPaymentResponse(paymentModel)))
 }
 
 func (h *Handler) MockSuccess(c *gin.Context) {

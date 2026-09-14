@@ -28,6 +28,11 @@ type MockFailResult struct {
 	Payment model.Payment
 }
 
+type PaymentDetailResult struct {
+	Payment model.Payment
+	Orders  []payment.PaymentOrderView
+}
+
 func NewService(
 	db *sqlx.DB,
 	paymentRepository *payment.Repository,
@@ -42,8 +47,22 @@ func NewService(
 	}
 }
 
-func (s *Service) Detail(ctx context.Context, paymentID string, userID uint64) (model.Payment, error) {
-	return payment.NewService(s.paymentRepository).Detail(ctx, paymentID, userID)
+func (s *Service) Detail(ctx context.Context, paymentID string, userID uint64) (PaymentDetailResult, error) {
+	paymentService := payment.NewService(s.paymentRepository)
+	paymentModel, err := paymentService.Detail(ctx, paymentID, userID)
+	if err != nil {
+		return PaymentDetailResult{}, err
+	}
+
+	orders, err := paymentService.ListOrders(ctx, paymentID, userID)
+	if err != nil {
+		return PaymentDetailResult{}, err
+	}
+
+	return PaymentDetailResult{
+		Payment: paymentModel,
+		Orders:  orders,
+	}, nil
 }
 
 func (s *Service) StartPay(ctx context.Context, paymentID string, userID uint64) (model.Payment, error) {

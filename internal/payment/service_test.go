@@ -37,6 +37,10 @@ func (r *fakeRepository) FindByIDAndUser(ctx context.Context, paymentID string, 
 	return model.Payment{ID: paymentID, UserID: userID, Status: "UNPAID"}, nil
 }
 
+func (r *fakeRepository) ListOrders(ctx context.Context, paymentID string, userID uint64) ([]PaymentOrderView, error) {
+	return []PaymentOrderView{{OrderID: "order-001", Status: "WAITING_PAYMENT", TicketPrice: "99.00"}}, nil
+}
+
 func (r *fakeRepository) StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error) {
 	return 1, nil
 }
@@ -114,6 +118,13 @@ func TestCreateOrderLinksRejectsInvalidLinks(t *testing.T) {
 
 func TestStartPayRejectsInvalidRequest(t *testing.T) {
 	err := NewService(&fakeRepository{}).StartPay(context.Background(), "", 10001)
+	if !errors.Is(err, ErrInvalidPayment) {
+		t.Fatalf("expected invalid payment error, got %v", err)
+	}
+}
+
+func TestListOrdersRejectsInvalidRequest(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).ListOrders(context.Background(), "", 10001)
 	if !errors.Is(err, ErrInvalidPayment) {
 		t.Fatalf("expected invalid payment error, got %v", err)
 	}

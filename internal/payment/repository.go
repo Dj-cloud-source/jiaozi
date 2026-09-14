@@ -128,6 +128,29 @@ func (r *Repository) FindByIDAndUser(ctx context.Context, paymentID string, user
 	return payment, nil
 }
 
+func (r *Repository) ListOrders(ctx context.Context, paymentID string, userID uint64) ([]PaymentOrderView, error) {
+	var orders []PaymentOrderView
+	err := r.executor.SelectContext(
+		ctx,
+		&orders,
+		`SELECT o.id AS order_id,
+		        o.status,
+		        CAST(o.ticket_price AS CHAR) AS ticket_price
+		 FROM payment_orders po
+		 JOIN ticket_orders o ON o.id = po.order_id
+		 WHERE po.payment_id = ?
+		   AND o.user_id = ?
+		 ORDER BY o.created_at ASC`,
+		paymentID,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
 func (r *Repository) StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error) {
 	result, err := r.executor.ExecContext(
 		ctx,
