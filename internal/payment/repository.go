@@ -7,10 +7,11 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"jiaozi/internal/model"
+	"jiaozi/internal/platform/database"
 )
 
 type Repository struct {
-	db *sqlx.DB
+	executor database.Executor
 }
 
 type CreatePaymentParams struct {
@@ -25,11 +26,15 @@ type CreatePaymentParams struct {
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{executor: db}
+}
+
+func (r *Repository) WithExecutor(executor database.Executor) *Repository {
+	return &Repository{executor: executor}
 }
 
 func (r *Repository) Create(ctx context.Context, params CreatePaymentParams) (model.Payment, error) {
-	_, err := r.db.ExecContext(
+	_, err := r.executor.ExecContext(
 		ctx,
 		`INSERT INTO payments (
 			id,
@@ -73,7 +78,7 @@ func parsePaymentDeadline(value string) time.Time {
 
 func (r *Repository) CreateOrderLinks(ctx context.Context, links []PaymentOrderLink) error {
 	for _, link := range links {
-		_, err := r.db.ExecContext(
+		_, err := r.executor.ExecContext(
 			ctx,
 			`INSERT INTO payment_orders (payment_id, order_id, amount) VALUES (?, ?, ?)`,
 			link.PaymentID,

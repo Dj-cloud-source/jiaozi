@@ -6,10 +6,11 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"jiaozi/internal/model"
+	"jiaozi/internal/platform/database"
 )
 
 type Repository struct {
-	db *sqlx.DB
+	executor database.Executor
 }
 
 type CreatePassengerParams struct {
@@ -19,11 +20,15 @@ type CreatePassengerParams struct {
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{executor: db}
+}
+
+func (r *Repository) WithExecutor(executor database.Executor) *Repository {
+	return &Repository{executor: executor}
 }
 
 func (r *Repository) Create(ctx context.Context, params CreatePassengerParams) (model.Passenger, error) {
-	result, err := r.db.ExecContext(
+	result, err := r.executor.ExecContext(
 		ctx,
 		`INSERT INTO passengers (user_id, name, id_card) VALUES (?, ?, ?)`,
 		params.UserID,
@@ -49,7 +54,7 @@ func (r *Repository) Create(ctx context.Context, params CreatePassengerParams) (
 
 func (r *Repository) HasActiveTicket(ctx context.Context, idCard string, trainID uint64) (bool, error) {
 	var count int
-	err := r.db.GetContext(
+	err := r.executor.GetContext(
 		ctx,
 		&count,
 		`SELECT COUNT(1)

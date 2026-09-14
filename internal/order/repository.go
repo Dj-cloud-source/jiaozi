@@ -6,10 +6,11 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"jiaozi/internal/model"
+	"jiaozi/internal/platform/database"
 )
 
 type Repository struct {
-	db *sqlx.DB
+	executor database.Executor
 }
 
 type CreateTicketOrderParams struct {
@@ -24,11 +25,15 @@ type CreateTicketOrderParams struct {
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{executor: db}
+}
+
+func (r *Repository) WithExecutor(executor database.Executor) *Repository {
+	return &Repository{executor: executor}
 }
 
 func (r *Repository) Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error) {
-	_, err := r.db.ExecContext(
+	_, err := r.executor.ExecContext(
 		ctx,
 		`INSERT INTO ticket_orders (
 			id,

@@ -5,19 +5,25 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
+	"jiaozi/internal/platform/database"
 )
 
 type Repository struct {
-	db *sqlx.DB
+	executor database.Executor
 }
 
 func NewRepository(db *sqlx.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{executor: db}
+}
+
+func (r *Repository) WithExecutor(executor database.Executor) *Repository {
+	return &Repository{executor: executor}
 }
 
 func (r *Repository) ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error) {
 	var seatNos []uint64
-	err := r.db.SelectContext(
+	err := r.executor.SelectContext(
 		ctx,
 		&seatNos,
 		`SELECT seat_no
@@ -59,7 +65,7 @@ func (r *Repository) LockSeats(ctx context.Context, params LockSeatsParams) (int
 		return 0, err
 	}
 
-	result, err := r.db.ExecContext(ctx, r.db.Rebind(query), args...)
+	result, err := r.executor.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -68,7 +74,7 @@ func (r *Repository) LockSeats(ctx context.Context, params LockSeatsParams) (int
 }
 
 func (r *Repository) ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error) {
-	result, err := r.db.ExecContext(
+	result, err := r.executor.ExecContext(
 		ctx,
 		`UPDATE seats
 		 SET status = ?,
@@ -88,7 +94,7 @@ func (r *Repository) ReleaseSeats(ctx context.Context, params OrderSeatActionPar
 }
 
 func (r *Repository) MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error) {
-	result, err := r.db.ExecContext(
+	result, err := r.executor.ExecContext(
 		ctx,
 		`UPDATE seats
 		 SET status = ?
