@@ -2,15 +2,11 @@ package order
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
-	"regexp"
 	"time"
 
+	"jiaozi/internal/common"
 	"jiaozi/internal/model"
 )
-
-var pricePattern = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 
 type repository interface {
 	Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error)
@@ -40,11 +36,11 @@ func (s *Service) Create(ctx context.Context, req CreateTicketOrderRequest) (mod
 		req.SeatID == 0 ||
 		req.TicketPrice == "" ||
 		req.PaymentDeadline.IsZero() ||
-		!pricePattern.MatchString(req.TicketPrice) {
+		!common.IsMoney(req.TicketPrice) {
 		return model.TicketOrder{}, ErrInvalidTicketOrder
 	}
 
-	id, err := newUUID()
+	id, err := common.NewUUID()
 	if err != nil {
 		return model.TicketOrder{}, err
 	}
@@ -59,25 +55,6 @@ func (s *Service) Create(ctx context.Context, req CreateTicketOrderRequest) (mod
 		Status:          "WAITING_PAYMENT",
 		PaymentDeadline: req.PaymentDeadline.Format("2006-01-02 15:04:05"),
 	})
-}
-
-func newUUID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-
-	return fmt.Sprintf(
-		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		b[0], b[1], b[2], b[3],
-		b[4], b[5],
-		b[6], b[7],
-		b[8], b[9],
-		b[10], b[11], b[12], b[13], b[14], b[15],
-	), nil
 }
 
 func parsePaymentDeadline(value string) time.Time {
