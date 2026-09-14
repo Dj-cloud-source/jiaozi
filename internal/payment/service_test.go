@@ -11,6 +11,7 @@ import (
 
 type fakeRepository struct {
 	params CreatePaymentParams
+	links  []PaymentOrderLink
 }
 
 func (r *fakeRepository) Create(ctx context.Context, params CreatePaymentParams) (model.Payment, error) {
@@ -25,6 +26,11 @@ func (r *fakeRepository) Create(ctx context.Context, params CreatePaymentParams)
 		PaymentDeadline: parsePaymentDeadline(params.PaymentDeadline),
 		Provider:        params.Provider,
 	}, nil
+}
+
+func (r *fakeRepository) CreateOrderLinks(ctx context.Context, links []PaymentOrderLink) error {
+	r.links = links
+	return nil
 }
 
 func TestCreatePaymentCreatesUnpaidMockPayment(t *testing.T) {
@@ -59,6 +65,31 @@ func TestCreatePaymentRejectsInvalidRequest(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Create(context.Background(), CreatePaymentRequest{
 		UserID: 10001,
 		Amount: "abc",
+	})
+	if !errors.Is(err, ErrInvalidPayment) {
+		t.Fatalf("expected invalid payment error, got %v", err)
+	}
+}
+
+func TestCreateOrderLinksAcceptsOneOrTwoLinks(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(repository)
+
+	err := service.CreateOrderLinks(context.Background(), []PaymentOrderLink{
+		{PaymentID: "payment-001", OrderID: "order-001", Amount: "99.00"},
+		{PaymentID: "payment-001", OrderID: "order-002", Amount: "99.00"},
+	})
+	if err != nil {
+		t.Fatalf("create order links failed: %v", err)
+	}
+	if len(repository.links) != 2 {
+		t.Fatalf("expected 2 links, got %d", len(repository.links))
+	}
+}
+
+func TestCreateOrderLinksRejectsInvalidLinks(t *testing.T) {
+	err := NewService(&fakeRepository{}).CreateOrderLinks(context.Background(), []PaymentOrderLink{
+		{PaymentID: "payment-001", OrderID: "", Amount: "99.00"},
 	})
 	if !errors.Is(err, ErrInvalidPayment) {
 		t.Fatalf("expected invalid payment error, got %v", err)

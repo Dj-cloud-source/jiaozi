@@ -70,3 +70,20 @@ func parsePaymentDeadline(value string) time.Time {
 	deadline, _ := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
 	return deadline
 }
+
+func (r *Repository) CreateOrderLinks(ctx context.Context, links []PaymentOrderLink) error {
+	for _, link := range links {
+		_, err := r.db.ExecContext(
+			ctx,
+			`INSERT INTO payment_orders (payment_id, order_id, amount) VALUES (?, ?, ?)`,
+			link.PaymentID,
+			link.OrderID,
+			link.Amount,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

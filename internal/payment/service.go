@@ -10,6 +10,7 @@ import (
 
 type repository interface {
 	Create(ctx context.Context, params CreatePaymentParams) (model.Payment, error)
+	CreateOrderLinks(ctx context.Context, links []PaymentOrderLink) error
 }
 
 type Service struct {
@@ -49,4 +50,21 @@ func (s *Service) Create(ctx context.Context, req CreatePaymentRequest) (model.P
 		PaymentDeadline: req.PaymentDeadline.Format("2006-01-02 15:04:05"),
 		Provider:        "MOCK",
 	})
+}
+
+func (s *Service) CreateOrderLinks(ctx context.Context, links []PaymentOrderLink) error {
+	if len(links) == 0 || len(links) > 2 {
+		return ErrInvalidPayment
+	}
+
+	for _, link := range links {
+		if link.PaymentID == "" ||
+			link.OrderID == "" ||
+			link.Amount == "" ||
+			!common.IsMoney(link.Amount) {
+			return ErrInvalidPayment
+		}
+	}
+
+	return s.repository.CreateOrderLinks(ctx, links)
 }
