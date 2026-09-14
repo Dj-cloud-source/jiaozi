@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -108,6 +109,28 @@ func (r *Repository) FindByIDAndUser(ctx context.Context, orderID string, userID
 	}
 
 	return orderView, nil
+}
+
+func (r *Repository) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE ticket_orders
+		 SET status = ?,
+		     cancelled_at = ?
+		 WHERE id = ?
+		   AND user_id = ?
+		   AND status = ?`,
+		"CANCELLED",
+		cancelledAt,
+		orderID,
+		userID,
+		"WAITING_PAYMENT",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
 }
 
 func orderViewSelectSQL() string {

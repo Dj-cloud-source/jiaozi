@@ -31,6 +31,7 @@ type OrderHandler interface {
 	Create(*gin.Context)
 	List(*gin.Context)
 	Detail(*gin.Context)
+	Cancel(*gin.Context)
 }
 
 func NewRouter(
@@ -68,6 +69,7 @@ func NewRouter(
 	orders.POST("", orderHandler.Create)
 	orders.GET("", orderHandler.List)
 	orders.GET("/:order_id", orderHandler.Detail)
+	orders.POST("/:order_id/cancel", orderHandler.Cancel)
 
 	return router
 }

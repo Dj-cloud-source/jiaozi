@@ -111,6 +111,18 @@ type OrderDetailResponse struct {
 	CompletedAt      *string           `json:"completed_at"`
 }
 
+type CancelOrderResponse struct {
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
+}
+
+func NewCancelOrderResponse(result CancelOrderResult) CancelOrderResponse {
+	return CancelOrderResponse{
+		OrderID: result.OrderID,
+		Status:  result.Status,
+	}
+}
+
 func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
 	return OrderDetailResponse{
 		OrderID:          orderView.OrderID,

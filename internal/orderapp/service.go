@@ -192,6 +192,51 @@ func (s *Service) OrderDetail(ctx context.Context, orderID string, userID uint64
 	return order.NewService(s.orderRepository).Detail(ctx, orderID, userID)
 }
 
+type CancelOrderResult struct {
+	OrderID string
+	Status  string
+}
+
+func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64) (CancelOrderResult, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return CancelOrderResult{}, err
+	}
+	defer tx.Rollback()
+
+	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
+	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+
+	orderView, err := orderService.Detail(ctx, orderID, userID)
+	if err != nil {
+		return CancelOrderResult{}, err
+	}
+	if orderView.Status != "WAITING_PAYMENT" {
+		return CancelOrderResult{}, order.ErrOrderStatusInvalid
+	}
+
+	if err := orderService.CancelWaitingPayment(ctx, orderID, userID, time.Now()); err != nil {
+		return CancelOrderResult{}, err
+	}
+
+	released, err := seatService.ReleaseSeats(ctx, seat.OrderSeatActionParams{OrderID: orderID})
+	if err != nil {
+		return CancelOrderResult{}, err
+	}
+	if released != 1 {
+		return CancelOrderResult{}, ErrSeatReleaseFailed
+	}
+
+	if err := tx.Commit(); err != nil {
+		return CancelOrderResult{}, err
+	}
+
+	return CancelOrderResult{
+		OrderID: orderID,
+		Status:  "CANCELLED",
+	}, nil
+}
+
 func priceForSeatClass(trainView train.TrainView, seatClass string) (string, error) {
 	switch seatClass {
 	case "FIRST_CLASS":

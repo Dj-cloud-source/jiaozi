@@ -12,6 +12,7 @@ type repository interface {
 	Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error)
 	ListByUser(ctx context.Context, userID uint64) ([]OrderView, error)
 	FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error)
+	CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error)
 }
 
 type Service struct {
@@ -83,4 +84,20 @@ func (s *Service) Detail(ctx context.Context, orderID string, userID uint64) (Or
 	}
 
 	return s.repository.FindByIDAndUser(ctx, orderID, userID)
+}
+
+func (s *Service) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) error {
+	if orderID == "" || userID == 0 || cancelledAt.IsZero() {
+		return ErrInvalidTicketOrder
+	}
+
+	affected, err := s.repository.CancelWaitingPayment(ctx, orderID, userID, cancelledAt)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrOrderStatusInvalid
+	}
+
+	return nil
 }

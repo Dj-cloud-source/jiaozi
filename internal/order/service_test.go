@@ -37,6 +37,10 @@ func (r *fakeRepository) FindByIDAndUser(ctx context.Context, orderID string, us
 	return r.detail, nil
 }
 
+func (r *fakeRepository) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error) {
+	return 1, nil
+}
+
 func TestCreateTicketOrderCreatesWaitingPaymentOrder(t *testing.T) {
 	repository := &fakeRepository{}
 	service := NewService(repository)
@@ -96,6 +100,13 @@ func TestListByUserReturnsOrders(t *testing.T) {
 
 func TestDetailRejectsInvalidRequest(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Detail(context.Background(), "", 10001)
+	if !errors.Is(err, ErrInvalidTicketOrder) {
+		t.Fatalf("expected invalid ticket order error, got %v", err)
+	}
+}
+
+func TestCancelWaitingPaymentRejectsInvalidRequest(t *testing.T) {
+	err := NewService(&fakeRepository{}).CancelWaitingPayment(context.Background(), "", 10001, time.Now())
 	if !errors.Is(err, ErrInvalidTicketOrder) {
 		t.Fatalf("expected invalid ticket order error, got %v", err)
 	}
