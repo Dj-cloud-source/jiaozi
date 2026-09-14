@@ -10,6 +10,8 @@ import (
 
 type repository interface {
 	Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error)
+	ListByUser(ctx context.Context, userID uint64) ([]OrderView, error)
+	FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error)
 }
 
 type Service struct {
@@ -65,4 +67,20 @@ func (s *Service) Create(ctx context.Context, req CreateTicketOrderRequest) (mod
 func parsePaymentDeadline(value string) time.Time {
 	deadline, _ := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
 	return deadline
+}
+
+func (s *Service) ListByUser(ctx context.Context, userID uint64) ([]OrderView, error) {
+	if userID == 0 {
+		return nil, ErrInvalidTicketOrder
+	}
+
+	return s.repository.ListByUser(ctx, userID)
+}
+
+func (s *Service) Detail(ctx context.Context, orderID string, userID uint64) (OrderView, error) {
+	if orderID == "" || userID == 0 {
+		return OrderView{}, ErrInvalidTicketOrder
+	}
+
+	return s.repository.FindByIDAndUser(ctx, orderID, userID)
 }

@@ -29,6 +29,8 @@ type TrainHandler interface {
 
 type OrderHandler interface {
 	Create(*gin.Context)
+	List(*gin.Context)
+	Detail(*gin.Context)
 }
 
 func NewRouter(
@@ -64,6 +66,8 @@ func NewRouter(
 	orders := api.Group("/orders")
 	orders.Use(authMiddleware)
 	orders.POST("", orderHandler.Create)
+	orders.GET("", orderHandler.List)
+	orders.GET("/:order_id", orderHandler.Detail)
 
 	return router
 }

@@ -1,5 +1,11 @@
 package orderapp
 
+import (
+	"time"
+
+	"jiaozi/internal/order"
+)
+
 type CreateOrderResponse struct {
 	PaymentID       string                 `json:"payment_id"`
 	PaymentDeadline string                 `json:"payment_deadline"`
@@ -48,4 +54,97 @@ func maskIDCard(idCard string) string {
 	}
 
 	return idCard[:4] + "********" + idCard[len(idCard)-4:]
+}
+
+type OrderListItemResponse struct {
+	OrderID          string `json:"order_id"`
+	TrainNo          string `json:"train_no"`
+	DepartureStation string `json:"departure_station"`
+	ArrivalStation   string `json:"arrival_station"`
+	DepartureTime    string `json:"departure_time"`
+	PassengerName    string `json:"passenger_name"`
+	SeatClass        string `json:"seat_class"`
+	SeatNo           uint64 `json:"seat_no"`
+	TicketPrice      string `json:"ticket_price"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"created_at"`
+}
+
+func NewOrderListResponse(orders []order.OrderView) []OrderListItemResponse {
+	response := make([]OrderListItemResponse, 0, len(orders))
+	for _, orderView := range orders {
+		response = append(response, OrderListItemResponse{
+			OrderID:          orderView.OrderID,
+			TrainNo:          orderView.TrainNo,
+			DepartureStation: orderView.DepartureStationName,
+			ArrivalStation:   orderView.ArrivalStationName,
+			DepartureTime:    formatTime(orderView.DepartureTime),
+			PassengerName:    orderView.PassengerName,
+			SeatClass:        orderView.SeatClass,
+			SeatNo:           orderView.SeatNo,
+			TicketPrice:      orderView.TicketPrice,
+			Status:           orderView.Status,
+			CreatedAt:        formatTime(orderView.CreatedAt),
+		})
+	}
+
+	return response
+}
+
+type OrderDetailResponse struct {
+	OrderID          string            `json:"order_id"`
+	TrainID          uint64            `json:"train_id"`
+	TrainNo          string            `json:"train_no"`
+	DepartureStation string            `json:"departure_station"`
+	ArrivalStation   string            `json:"arrival_station"`
+	DepartureTime    string            `json:"departure_time"`
+	Passenger         PassengerSnapshot `json:"passenger"`
+	SeatClass        string            `json:"seat_class"`
+	SeatNo           uint64            `json:"seat_no"`
+	TicketPrice      string            `json:"ticket_price"`
+	Status           string            `json:"status"`
+	PaymentDeadline  string            `json:"payment_deadline"`
+	CreatedAt        string            `json:"created_at"`
+	TicketedAt        *string           `json:"ticketed_at"`
+	CancelledAt      *string           `json:"cancelled_at"`
+	ReturnedAt       *string           `json:"returned_at"`
+	CompletedAt      *string           `json:"completed_at"`
+}
+
+func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
+	return OrderDetailResponse{
+		OrderID:          orderView.OrderID,
+		TrainID:          orderView.TrainID,
+		TrainNo:          orderView.TrainNo,
+		DepartureStation: orderView.DepartureStationName,
+		ArrivalStation:   orderView.ArrivalStationName,
+		DepartureTime:    formatTime(orderView.DepartureTime),
+		Passenger: PassengerSnapshot{
+			Name:         orderView.PassengerName,
+			IDCardMasked: maskIDCard(orderView.PassengerIDCard),
+		},
+		SeatClass:       orderView.SeatClass,
+		SeatNo:          orderView.SeatNo,
+		TicketPrice:     orderView.TicketPrice,
+		Status:          orderView.Status,
+		PaymentDeadline: formatTime(orderView.PaymentDeadline),
+		CreatedAt:       formatTime(orderView.CreatedAt),
+		TicketedAt:       formatOptionalTime(orderView.TicketedAt),
+		CancelledAt:     formatOptionalTime(orderView.CancelledAt),
+		ReturnedAt:      formatOptionalTime(orderView.ReturnedAt),
+		CompletedAt:     formatOptionalTime(orderView.CompletedAt),
+	}
+}
+
+func formatTime(value time.Time) string {
+	return value.Format("2006-01-02T15:04:05-07:00")
+}
+
+func formatOptionalTime(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+
+	formatted := formatTime(*value)
+	return &formatted
 }

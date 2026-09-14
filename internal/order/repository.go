@@ -2,6 +2,8 @@ package order
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/jmoiron/sqlx"
 
@@ -68,4 +70,71 @@ func (r *Repository) Create(ctx context.Context, params CreateTicketOrderParams)
 		Status:          params.Status,
 		PaymentDeadline: parsePaymentDeadline(params.PaymentDeadline),
 	}, nil
+}
+
+func (r *Repository) ListByUser(ctx context.Context, userID uint64) ([]OrderView, error) {
+	var orders []OrderView
+	err := r.executor.SelectContext(
+		ctx,
+		&orders,
+		orderViewSelectSQL()+`
+		 WHERE o.user_id = ?
+		 ORDER BY o.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (r *Repository) FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error) {
+	var orderView OrderView
+	err := r.executor.GetContext(
+		ctx,
+		&orderView,
+		orderViewSelectSQL()+`
+		 WHERE o.id = ?
+		   AND o.user_id = ?`,
+		orderID,
+		userID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return OrderView{}, ErrOrderNotFound
+		}
+		return OrderView{}, err
+	}
+
+	return orderView, nil
+}
+
+func orderViewSelectSQL() string {
+	return `SELECT
+		o.id AS order_id,
+		o.user_id,
+		o.train_id,
+		t.train_no,
+		ds.name AS departure_station_name,
+		asn.name AS arrival_station_name,
+		t.departure_time,
+		p.name AS passenger_name,
+		p.id_card AS passenger_id_card,
+		s.seat_class,
+		s.seat_no,
+		CAST(o.ticket_price AS CHAR) AS ticket_price,
+		o.status,
+		o.payment_deadline,
+		o.created_at,
+		o.ticketed_at,
+		o.cancelled_at,
+		o.returned_at,
+		o.completed_at
+	FROM ticket_orders o
+	JOIN trains t ON t.id = o.train_id
+	JOIN stations ds ON ds.id = t.departure_station_id
+	JOIN stations asn ON asn.id = t.arrival_station_id
+	JOIN passengers p ON p.id = o.passenger_id
+	JOIN seats s ON s.id = o.seat_id`
 }

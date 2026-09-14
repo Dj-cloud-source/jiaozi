@@ -184,6 +184,14 @@ func (s *Service) CreateOrder(ctx context.Context, req CreateOrderRequest) (Crea
 	}, nil
 }
 
+func (s *Service) ListOrders(ctx context.Context, userID uint64) ([]order.OrderView, error) {
+	return order.NewService(s.orderRepository).ListByUser(ctx, userID)
+}
+
+func (s *Service) OrderDetail(ctx context.Context, orderID string, userID uint64) (order.OrderView, error) {
+	return order.NewService(s.orderRepository).Detail(ctx, orderID, userID)
+}
+
 func priceForSeatClass(trainView train.TrainView, seatClass string) (string, error) {
 	switch seatClass {
 	case "FIRST_CLASS":

@@ -11,6 +11,8 @@ import (
 
 type fakeRepository struct {
 	params CreateTicketOrderParams
+	orders []OrderView
+	detail OrderView
 }
 
 func (r *fakeRepository) Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error) {
@@ -25,6 +27,14 @@ func (r *fakeRepository) Create(ctx context.Context, params CreateTicketOrderPar
 		Status:          params.Status,
 		PaymentDeadline: parsePaymentDeadline(params.PaymentDeadline),
 	}, nil
+}
+
+func (r *fakeRepository) ListByUser(ctx context.Context, userID uint64) ([]OrderView, error) {
+	return r.orders, nil
+}
+
+func (r *fakeRepository) FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error) {
+	return r.detail, nil
 }
 
 func TestCreateTicketOrderCreatesWaitingPaymentOrder(t *testing.T) {
@@ -63,6 +73,29 @@ func TestCreateTicketOrderRejectsInvalidRequest(t *testing.T) {
 		SeatID:      40001,
 		TicketPrice: "abc",
 	})
+	if !errors.Is(err, ErrInvalidTicketOrder) {
+		t.Fatalf("expected invalid ticket order error, got %v", err)
+	}
+}
+
+func TestListByUserReturnsOrders(t *testing.T) {
+	service := NewService(&fakeRepository{
+		orders: []OrderView{
+			{OrderID: "order-001", UserID: 10001},
+		},
+	})
+
+	orders, err := service.ListByUser(context.Background(), 10001)
+	if err != nil {
+		t.Fatalf("list orders failed: %v", err)
+	}
+	if len(orders) != 1 {
+		t.Fatalf("expected 1 order, got %d", len(orders))
+	}
+}
+
+func TestDetailRejectsInvalidRequest(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).Detail(context.Background(), "", 10001)
 	if !errors.Is(err, ErrInvalidTicketOrder) {
 		t.Fatalf("expected invalid ticket order error, got %v", err)
 	}

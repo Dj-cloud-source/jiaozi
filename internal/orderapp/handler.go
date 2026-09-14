@@ -8,6 +8,7 @@ import (
 
 	"jiaozi/internal/auth"
 	"jiaozi/internal/httpserver"
+	"jiaozi/internal/order"
 	"jiaozi/internal/train"
 )
 
@@ -20,8 +21,8 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) Create(c *gin.Context) {
-	value, exists := c.Get(auth.ContextUserIDKey)
-	if !exists {
+	userID, ok := currentUserID(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, httpserver.Error(41003, "unauthorized"))
 		return
 	}
@@ -36,7 +37,6 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	userID := value.(uint64)
 	result, err := h.service.CreateOrder(c.Request.Context(), CreateOrderRequest{
 		UserID:          userID,
 		TrainID:         req.TrainID,
@@ -63,4 +63,53 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, httpserver.Success(NewCreateOrderResponse(result)))
+}
+
+func (h *Handler) List(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, httpserver.Error(41003, "unauthorized"))
+		return
+	}
+
+	orders, err := h.service.ListOrders(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewOrderListResponse(orders)))
+}
+
+func (h *Handler) Detail(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, httpserver.Error(41003, "unauthorized"))
+		return
+	}
+
+	orderView, err := h.service.OrderDetail(c.Request.Context(), c.Param("order_id"), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, order.ErrInvalidTicketOrder):
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		case errors.Is(err, order.ErrOrderNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(43004, "order not found"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewOrderDetailResponse(orderView)))
+}
+
+func currentUserID(c *gin.Context) (uint64, bool) {
+	value, exists := c.Get(auth.ContextUserIDKey)
+	if !exists {
+		return 0, false
+	}
+
+	userID, ok := value.(uint64)
+	return userID, ok
 }
