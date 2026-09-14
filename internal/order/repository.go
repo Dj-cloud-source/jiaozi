@@ -245,6 +245,49 @@ func (r *Repository) ReturnTicketed(ctx context.Context, orderID string, userID 
 	return result.RowsAffected()
 }
 
+func (r *Repository) ListArrivedTicketedIDs(ctx context.Context, query CompletedOrderQuery) ([]string, error) {
+	var orderIDs []string
+	err := r.executor.SelectContext(
+		ctx,
+		&orderIDs,
+		`SELECT o.id
+		 FROM ticket_orders o
+		 JOIN trains t ON t.id = o.train_id
+		 WHERE o.status = ?
+		   AND t.arrival_time <= ?
+		 ORDER BY t.arrival_time ASC
+		 LIMIT ?`,
+		"TICKETED",
+		query.Now,
+		query.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return orderIDs, nil
+}
+
+func (r *Repository) CompleteTicketed(ctx context.Context, orderID string, completedAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE ticket_orders
+		 SET status = ?,
+		     completed_at = ?
+		 WHERE id = ?
+		   AND status = ?`,
+		"COMPLETED",
+		completedAt,
+		orderID,
+		"TICKETED",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
 func orderViewSelectSQL() string {
 	return `SELECT
 		o.id AS order_id,

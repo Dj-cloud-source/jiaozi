@@ -30,6 +30,7 @@ type AuthConfig struct {
 type SchedulerConfig struct {
 	TrainStatusIntervalSeconds int64
 	OrderTimeoutIntervalSeconds int64
+	OrderCompleteIntervalSeconds int64
 }
 
 func Load() Config {
@@ -50,8 +51,9 @@ func Load() Config {
 			TokenExpireSeconds: 604800,
 		},
 		Scheduler: SchedulerConfig{
-			TrainStatusIntervalSeconds:  30,
-			OrderTimeoutIntervalSeconds: 30,
+			TrainStatusIntervalSeconds:   30,
+			OrderTimeoutIntervalSeconds:  30,
+			OrderCompleteIntervalSeconds: 30,
 		},
 	}
 }

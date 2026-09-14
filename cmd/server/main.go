@@ -82,6 +82,12 @@ func main() {
 	)
 	orderTimeoutScheduler.Start(context.Background())
 
+	orderCompleteScheduler := scheduler.NewOrderCompleteScheduler(
+		orderAppService,
+		time.Duration(cfg.Scheduler.OrderCompleteIntervalSeconds)*time.Second,
+	)
+	orderCompleteScheduler.Start(context.Background())
+
 	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler, orderAppHandler, paymentAppHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())

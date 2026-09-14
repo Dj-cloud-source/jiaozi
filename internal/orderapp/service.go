@@ -18,6 +18,7 @@ import (
 
 const paymentWindow = 10 * time.Minute
 const expiredOrderBatchSize = 100
+const completedOrderBatchSize = 100
 
 type Service struct {
 	db                  *sqlx.DB
@@ -304,6 +305,24 @@ func (s *Service) CancelExpiredOrders(ctx context.Context, now time.Time) (int64
 	}
 
 	return cancelled, nil
+}
+
+func (s *Service) CompleteArrivedOrders(ctx context.Context, now time.Time) (int64, error) {
+	orderService := order.NewService(s.orderRepository)
+	orderIDs, err := orderService.ListArrivedTicketedIDs(ctx, now, completedOrderBatchSize)
+	if err != nil {
+		return 0, err
+	}
+
+	var completed int64
+	for _, orderID := range orderIDs {
+		if err := orderService.CompleteTicketed(ctx, orderID, now); err != nil {
+			return completed, err
+		}
+		completed++
+	}
+
+	return completed, nil
 }
 
 func (s *Service) cancelExpiredOrder(ctx context.Context, orderID string, now time.Time) error {
