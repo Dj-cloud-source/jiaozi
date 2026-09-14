@@ -133,6 +133,52 @@ func (r *Repository) CancelWaitingPayment(ctx context.Context, orderID string, u
 	return result.RowsAffected()
 }
 
+func (r *Repository) ListWaitingPaymentIDsByPayment(ctx context.Context, paymentID string, userID uint64) ([]string, error) {
+	var orderIDs []string
+	err := r.executor.SelectContext(
+		ctx,
+		&orderIDs,
+		`SELECT o.id
+		 FROM ticket_orders o
+		 JOIN payment_orders po ON po.order_id = o.id
+		 WHERE po.payment_id = ?
+		   AND o.user_id = ?
+		   AND o.status = ?
+		 ORDER BY o.created_at ASC`,
+		paymentID,
+		userID,
+		"WAITING_PAYMENT",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return orderIDs, nil
+}
+
+func (r *Repository) MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE ticket_orders o
+		 JOIN payment_orders po ON po.order_id = o.id
+		 SET o.status = ?,
+		     o.ticketed_at = ?
+		 WHERE po.payment_id = ?
+		   AND o.user_id = ?
+		   AND o.status = ?`,
+		"TICKETED",
+		ticketedAt,
+		paymentID,
+		userID,
+		"WAITING_PAYMENT",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
 func orderViewSelectSQL() string {
 	return `SELECT
 		o.id AS order_id,

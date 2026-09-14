@@ -33,6 +33,18 @@ func (r *fakeRepository) CreateOrderLinks(ctx context.Context, links []PaymentOr
 	return nil
 }
 
+func (r *fakeRepository) FindByIDAndUser(ctx context.Context, paymentID string, userID uint64) (model.Payment, error) {
+	return model.Payment{ID: paymentID, UserID: userID, Status: "UNPAID"}, nil
+}
+
+func (r *fakeRepository) StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error) {
+	return 1, nil
+}
+
+func (r *fakeRepository) MarkSuccess(ctx context.Context, paymentID string, userID uint64, paidAt time.Time) (int64, error) {
+	return 1, nil
+}
+
 func TestCreatePaymentCreatesUnpaidMockPayment(t *testing.T) {
 	repository := &fakeRepository{}
 	service := NewService(repository)
@@ -91,6 +103,13 @@ func TestCreateOrderLinksRejectsInvalidLinks(t *testing.T) {
 	err := NewService(&fakeRepository{}).CreateOrderLinks(context.Background(), []PaymentOrderLink{
 		{PaymentID: "payment-001", OrderID: "", Amount: "99.00"},
 	})
+	if !errors.Is(err, ErrInvalidPayment) {
+		t.Fatalf("expected invalid payment error, got %v", err)
+	}
+}
+
+func TestStartPayRejectsInvalidRequest(t *testing.T) {
+	err := NewService(&fakeRepository{}).StartPay(context.Background(), "", 10001)
 	if !errors.Is(err, ErrInvalidPayment) {
 		t.Fatalf("expected invalid payment error, got %v", err)
 	}

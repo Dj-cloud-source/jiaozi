@@ -12,6 +12,7 @@ import (
 	"jiaozi/internal/orderapp"
 	"jiaozi/internal/passenger"
 	"jiaozi/internal/payment"
+	"jiaozi/internal/paymentapp"
 	"jiaozi/internal/platform/database"
 	"jiaozi/internal/scheduler"
 	"jiaozi/internal/seat"
@@ -61,13 +62,21 @@ func main() {
 	)
 	orderAppHandler := orderapp.NewHandler(orderAppService)
 
+	paymentAppService := paymentapp.NewService(
+		db,
+		paymentRepository,
+		orderRepository,
+		seatRepository,
+	)
+	paymentAppHandler := paymentapp.NewHandler(paymentAppService)
+
 	trainStatusScheduler := scheduler.NewTrainStatusScheduler(
 		trainService,
 		time.Duration(cfg.Scheduler.TrainStatusIntervalSeconds)*time.Second,
 	)
 	trainStatusScheduler.Start(context.Background())
 
-	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler, orderAppHandler)
+	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler, orderAppHandler, paymentAppHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())
 	if err := router.Run(cfg.ServerAddress()); err != nil {

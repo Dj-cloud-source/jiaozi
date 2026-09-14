@@ -2,6 +2,8 @@ package payment
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -91,4 +93,80 @@ func (r *Repository) CreateOrderLinks(ctx context.Context, links []PaymentOrderL
 	}
 
 	return nil
+}
+
+func (r *Repository) FindByIDAndUser(ctx context.Context, paymentID string, userID uint64) (model.Payment, error) {
+	var payment model.Payment
+	err := r.executor.GetContext(
+		ctx,
+		&payment,
+		`SELECT id,
+		        user_id,
+		        CAST(original_amount AS CHAR) AS original_amount,
+		        CAST(payable_amount AS CHAR) AS payable_amount,
+		        CAST(refunded_amount AS CHAR) AS refunded_amount,
+		        status,
+		        payment_deadline,
+		        provider,
+		        provider_trade_no,
+		        created_at,
+		        paid_at,
+		        updated_at
+		 FROM payments
+		 WHERE id = ?
+		   AND user_id = ?`,
+		paymentID,
+		userID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Payment{}, ErrPaymentNotFound
+		}
+		return model.Payment{}, err
+	}
+
+	return payment, nil
+}
+
+func (r *Repository) StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE payments
+		 SET status = ?
+		 WHERE id = ?
+		   AND user_id = ?
+		   AND status IN (?, ?)`,
+		"PAYING",
+		paymentID,
+		userID,
+		"UNPAID",
+		"FAILED",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
+func (r *Repository) MarkSuccess(ctx context.Context, paymentID string, userID uint64, paidAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE payments
+		 SET status = ?,
+		     paid_at = ?
+		 WHERE id = ?
+		   AND user_id = ?
+		   AND status = ?`,
+		"SUCCESS",
+		paidAt,
+		paymentID,
+		userID,
+		"PAYING",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
 }

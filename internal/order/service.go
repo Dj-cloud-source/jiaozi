@@ -13,6 +13,8 @@ type repository interface {
 	ListByUser(ctx context.Context, userID uint64) ([]OrderView, error)
 	FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error)
 	CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error)
+	ListWaitingPaymentIDsByPayment(ctx context.Context, paymentID string, userID uint64) ([]string, error)
+	MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time) (int64, error)
 }
 
 type Service struct {
@@ -96,6 +98,30 @@ func (s *Service) CancelWaitingPayment(ctx context.Context, orderID string, user
 		return err
 	}
 	if affected != 1 {
+		return ErrOrderStatusInvalid
+	}
+
+	return nil
+}
+
+func (s *Service) ListWaitingPaymentIDsByPayment(ctx context.Context, paymentID string, userID uint64) ([]string, error) {
+	if paymentID == "" || userID == 0 {
+		return nil, ErrInvalidTicketOrder
+	}
+
+	return s.repository.ListWaitingPaymentIDsByPayment(ctx, paymentID, userID)
+}
+
+func (s *Service) MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time, expectedCount int) error {
+	if paymentID == "" || userID == 0 || ticketedAt.IsZero() || expectedCount == 0 {
+		return ErrInvalidTicketOrder
+	}
+
+	affected, err := s.repository.MarkPaymentOrdersTicketed(ctx, paymentID, userID, ticketedAt)
+	if err != nil {
+		return err
+	}
+	if affected != int64(expectedCount) {
 		return ErrOrderStatusInvalid
 	}
 
