@@ -8,8 +8,13 @@ import (
 	"jiaozi/internal/auth"
 	"jiaozi/internal/config"
 	"jiaozi/internal/httpserver"
+	"jiaozi/internal/order"
+	"jiaozi/internal/orderapp"
+	"jiaozi/internal/passenger"
+	"jiaozi/internal/payment"
 	"jiaozi/internal/platform/database"
 	"jiaozi/internal/scheduler"
+	"jiaozi/internal/seat"
 	"jiaozi/internal/station"
 	"jiaozi/internal/train"
 	"jiaozi/internal/user"
@@ -42,13 +47,27 @@ func main() {
 	trainService := train.NewService(trainRepository)
 	trainHandler := train.NewHandler(trainService)
 
+	passengerRepository := passenger.NewRepository(db)
+	seatRepository := seat.NewRepository(db)
+	orderRepository := order.NewRepository(db)
+	paymentRepository := payment.NewRepository(db)
+	orderAppService := orderapp.NewService(
+		db,
+		trainService,
+		passengerRepository,
+		seatRepository,
+		orderRepository,
+		paymentRepository,
+	)
+	orderAppHandler := orderapp.NewHandler(orderAppService)
+
 	trainStatusScheduler := scheduler.NewTrainStatusScheduler(
 		trainService,
 		time.Duration(cfg.Scheduler.TrainStatusIntervalSeconds)*time.Second,
 	)
 	trainStatusScheduler.Start(context.Background())
 
-	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler)
+	router := httpserver.NewRouter(authHandler, authMiddleware, userHandler, stationHandler, trainHandler, orderAppHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())
 	if err := router.Run(cfg.ServerAddress()); err != nil {

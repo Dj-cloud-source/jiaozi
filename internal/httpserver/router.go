@@ -27,12 +27,17 @@ type TrainHandler interface {
 	Detail(*gin.Context)
 }
 
+type OrderHandler interface {
+	Create(*gin.Context)
+}
+
 func NewRouter(
 	authHandler AuthHandler,
 	authMiddleware gin.HandlerFunc,
 	userHandler UserHandler,
 	stationHandler StationHandler,
 	trainHandler TrainHandler,
+	orderHandler OrderHandler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
@@ -55,6 +60,10 @@ func NewRouter(
 	users := api.Group("/users")
 	users.Use(authMiddleware)
 	users.GET("/me", userHandler.Me)
+
+	orders := api.Group("/orders")
+	orders.Use(authMiddleware)
+	orders.POST("", orderHandler.Create)
 
 	return router
 }
