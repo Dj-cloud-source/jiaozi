@@ -38,6 +38,7 @@ type PaymentHandler interface {
 	Detail(*gin.Context)
 	Pay(*gin.Context)
 	MockSuccess(*gin.Context)
+	MockFail(*gin.Context)
 }
 
 func NewRouter(
@@ -83,6 +84,7 @@ func NewRouter(
 	payments.GET("/:payment_id", paymentHandler.Detail)
 	payments.POST("/:payment_id/pay", paymentHandler.Pay)
 	payments.POST("/:payment_id/mock/success", paymentHandler.MockSuccess)
+	payments.POST("/:payment_id/mock/fail", paymentHandler.MockFail)
 
 	return router
 }

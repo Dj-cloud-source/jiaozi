@@ -69,6 +69,22 @@ func (h *Handler) MockSuccess(c *gin.Context) {
 	c.JSON(http.StatusOK, httpserver.Success(NewMockSuccessResponse(result)))
 }
 
+func (h *Handler) MockFail(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, httpserver.Error(41003, "unauthorized"))
+		return
+	}
+
+	result, err := h.service.MockFail(c.Request.Context(), c.Param("payment_id"), userID)
+	if err != nil {
+		writePaymentError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewMockFailResponse(result)))
+}
+
 func currentUserID(c *gin.Context) (uint64, bool) {
 	value, exists := c.Get(auth.ContextUserIDKey)
 	if !exists {

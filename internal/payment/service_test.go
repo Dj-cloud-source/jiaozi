@@ -45,6 +45,10 @@ func (r *fakeRepository) MarkSuccess(ctx context.Context, paymentID string, user
 	return 1, nil
 }
 
+func (r *fakeRepository) MarkFailed(ctx context.Context, paymentID string, userID uint64) (int64, error) {
+	return 1, nil
+}
+
 func TestCreatePaymentCreatesUnpaidMockPayment(t *testing.T) {
 	repository := &fakeRepository{}
 	service := NewService(repository)
@@ -110,6 +114,13 @@ func TestCreateOrderLinksRejectsInvalidLinks(t *testing.T) {
 
 func TestStartPayRejectsInvalidRequest(t *testing.T) {
 	err := NewService(&fakeRepository{}).StartPay(context.Background(), "", 10001)
+	if !errors.Is(err, ErrInvalidPayment) {
+		t.Fatalf("expected invalid payment error, got %v", err)
+	}
+}
+
+func TestMarkFailedRejectsInvalidRequest(t *testing.T) {
+	err := NewService(&fakeRepository{}).MarkFailed(context.Background(), "", 10001)
 	if !errors.Is(err, ErrInvalidPayment) {
 		t.Fatalf("expected invalid payment error, got %v", err)
 	}

@@ -170,3 +170,23 @@ func (r *Repository) MarkSuccess(ctx context.Context, paymentID string, userID u
 
 	return result.RowsAffected()
 }
+
+func (r *Repository) MarkFailed(ctx context.Context, paymentID string, userID uint64) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE payments
+		 SET status = ?
+		 WHERE id = ?
+		   AND user_id = ?
+		   AND status = ?`,
+		"FAILED",
+		paymentID,
+		userID,
+		"PAYING",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

@@ -22,6 +22,11 @@ type MockSuccessResponse struct {
 	OrderIDs  []string `json:"order_ids"`
 }
 
+type MockFailResponse struct {
+	PaymentID string `json:"payment_id"`
+	Status    string `json:"status"`
+}
+
 func NewPaymentResponse(payment model.Payment) PaymentResponse {
 	return PaymentResponse{
 		PaymentID:       payment.ID,
@@ -39,6 +44,13 @@ func NewMockSuccessResponse(result MockSuccessResult) MockSuccessResponse {
 		PaymentID: result.Payment.ID,
 		Status:    result.Payment.Status,
 		OrderIDs:  result.OrderIDs,
+	}
+}
+
+func NewMockFailResponse(result MockFailResult) MockFailResponse {
+	return MockFailResponse{
+		PaymentID: result.Payment.ID,
+		Status:    result.Payment.Status,
 	}
 }
 

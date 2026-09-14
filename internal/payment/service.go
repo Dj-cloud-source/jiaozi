@@ -14,6 +14,7 @@ type repository interface {
 	FindByIDAndUser(ctx context.Context, paymentID string, userID uint64) (model.Payment, error)
 	StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error)
 	MarkSuccess(ctx context.Context, paymentID string, userID uint64, paidAt time.Time) (int64, error)
+	MarkFailed(ctx context.Context, paymentID string, userID uint64) (int64, error)
 }
 
 type Service struct {
@@ -102,6 +103,22 @@ func (s *Service) MarkSuccess(ctx context.Context, paymentID string, userID uint
 	}
 
 	affected, err := s.repository.MarkSuccess(ctx, paymentID, userID, paidAt)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrPaymentStatusInvalid
+	}
+
+	return nil
+}
+
+func (s *Service) MarkFailed(ctx context.Context, paymentID string, userID uint64) error {
+	if paymentID == "" || userID == 0 {
+		return ErrInvalidPayment
+	}
+
+	affected, err := s.repository.MarkFailed(ctx, paymentID, userID)
 	if err != nil {
 		return err
 	}

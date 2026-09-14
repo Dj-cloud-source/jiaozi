@@ -24,6 +24,10 @@ type MockSuccessResult struct {
 	OrderIDs []string
 }
 
+type MockFailResult struct {
+	Payment model.Payment
+}
+
 func NewService(
 	db *sqlx.DB,
 	paymentRepository *payment.Repository,
@@ -110,4 +114,22 @@ func (s *Service) MockSuccess(ctx context.Context, paymentID string, userID uint
 		Payment: paymentModel,
 		OrderIDs: orderIDs,
 	}, nil
+}
+
+func (s *Service) MockFail(ctx context.Context, paymentID string, userID uint64) (MockFailResult, error) {
+	paymentService := payment.NewService(s.paymentRepository)
+	if _, err := paymentService.Detail(ctx, paymentID, userID); err != nil {
+		return MockFailResult{}, err
+	}
+
+	if err := paymentService.MarkFailed(ctx, paymentID, userID); err != nil {
+		return MockFailResult{}, err
+	}
+
+	paymentModel, err := paymentService.Detail(ctx, paymentID, userID)
+	if err != nil {
+		return MockFailResult{}, err
+	}
+
+	return MockFailResult{Payment: paymentModel}, nil
 }
