@@ -17,6 +17,7 @@ type repository interface {
 	MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time) (int64, error)
 	ListExpiredWaitingPaymentIDs(ctx context.Context, query ExpiredOrderQuery) ([]string, error)
 	CancelExpiredWaitingPayment(ctx context.Context, orderID string, cancelledAt time.Time) (int64, error)
+	ReturnTicketed(ctx context.Context, orderID string, userID uint64, returnedAt time.Time) (int64, error)
 }
 
 type Service struct {
@@ -147,6 +148,22 @@ func (s *Service) CancelExpiredWaitingPayment(ctx context.Context, orderID strin
 	}
 
 	affected, err := s.repository.CancelExpiredWaitingPayment(ctx, orderID, cancelledAt)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrOrderStatusInvalid
+	}
+
+	return nil
+}
+
+func (s *Service) ReturnTicketed(ctx context.Context, orderID string, userID uint64, returnedAt time.Time) error {
+	if orderID == "" || userID == 0 || returnedAt.IsZero() {
+		return ErrInvalidTicketOrder
+	}
+
+	affected, err := s.repository.ReturnTicketed(ctx, orderID, userID, returnedAt)
 	if err != nil {
 		return err
 	}

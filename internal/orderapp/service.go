@@ -198,6 +198,11 @@ type CancelOrderResult struct {
 	Status  string
 }
 
+type ReturnOrderResult struct {
+	OrderID string
+	Status  string
+}
+
 func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64) (CancelOrderResult, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -235,6 +240,51 @@ func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64
 	return CancelOrderResult{
 		OrderID: orderID,
 		Status:  "CANCELLED",
+	}, nil
+}
+
+func (s *Service) ReturnOrder(ctx context.Context, orderID string, userID uint64) (ReturnOrderResult, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return ReturnOrderResult{}, err
+	}
+	defer tx.Rollback()
+
+	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
+	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+
+	orderView, err := orderService.Detail(ctx, orderID, userID)
+	if err != nil {
+		return ReturnOrderResult{}, err
+	}
+	if orderView.Status != "TICKETED" {
+		return ReturnOrderResult{}, order.ErrOrderStatusInvalid
+	}
+
+	now := time.Now()
+	if !now.Before(orderView.DepartureTime.Add(-10 * time.Minute)) {
+		return ReturnOrderResult{}, ErrReturnDeadlinePassed
+	}
+
+	if err := orderService.ReturnTicketed(ctx, orderID, userID, now); err != nil {
+		return ReturnOrderResult{}, err
+	}
+
+	returned, err := seatService.ReturnSoldSeat(ctx, seat.OrderSeatActionParams{OrderID: orderID})
+	if err != nil {
+		return ReturnOrderResult{}, err
+	}
+	if returned != 1 {
+		return ReturnOrderResult{}, ErrSeatReleaseFailed
+	}
+
+	if err := tx.Commit(); err != nil {
+		return ReturnOrderResult{}, err
+	}
+
+	return ReturnOrderResult{
+		OrderID: orderID,
+		Status:  "RETURNED",
 	}, nil
 }
 

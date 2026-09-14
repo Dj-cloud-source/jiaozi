@@ -9,4 +9,5 @@ var (
 	ErrNoAvailableSeat           = errors.New("no available seat")
 	ErrSeatLockFailed            = errors.New("seat lock failed")
 	ErrSeatReleaseFailed         = errors.New("seat release failed")
+	ErrReturnDeadlinePassed      = errors.New("return deadline passed")
 )

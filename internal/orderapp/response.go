@@ -116,8 +116,20 @@ type CancelOrderResponse struct {
 	Status  string `json:"status"`
 }
 
+type ReturnOrderResponse struct {
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
+}
+
 func NewCancelOrderResponse(result CancelOrderResult) CancelOrderResponse {
 	return CancelOrderResponse{
+		OrderID: result.OrderID,
+		Status:  result.Status,
+	}
+}
+
+func NewReturnOrderResponse(result ReturnOrderResult) ReturnOrderResponse {
+	return ReturnOrderResponse{
 		OrderID: result.OrderID,
 		Status:  result.Status,
 	}

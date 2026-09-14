@@ -131,6 +131,33 @@ func (h *Handler) Cancel(c *gin.Context) {
 	c.JSON(http.StatusOK, httpserver.Success(NewCancelOrderResponse(result)))
 }
 
+func (h *Handler) Return(c *gin.Context) {
+	userID, ok := currentUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, httpserver.Error(41003, "unauthorized"))
+		return
+	}
+
+	result, err := h.service.ReturnOrder(c.Request.Context(), c.Param("order_id"), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, order.ErrInvalidTicketOrder):
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		case errors.Is(err, order.ErrOrderNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(43004, "order not found"))
+		case errors.Is(err, order.ErrOrderStatusInvalid), errors.Is(err, ErrReturnDeadlinePassed):
+			c.JSON(http.StatusConflict, httpserver.Error(43007, "order cannot be returned"))
+		case errors.Is(err, ErrSeatReleaseFailed):
+			c.JSON(http.StatusConflict, httpserver.Error(43006, "seat release failed"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewReturnOrderResponse(result)))
+}
+
 func currentUserID(c *gin.Context) (uint64, bool) {
 	value, exists := c.Get(auth.ContextUserIDKey)
 	if !exists {

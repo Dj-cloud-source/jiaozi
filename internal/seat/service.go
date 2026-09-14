@@ -12,6 +12,7 @@ type repository interface {
 	LockSeats(ctx context.Context, params LockSeatsParams) (int64, error)
 	ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error)
 	MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error)
+	ReturnSoldSeat(ctx context.Context, params OrderSeatActionParams) (int64, error)
 }
 
 type Service struct {
@@ -56,4 +57,12 @@ func (s *Service) MarkSeatsSold(ctx context.Context, params OrderSeatActionParam
 	}
 
 	return s.repository.MarkSeatsSold(ctx, params)
+}
+
+func (s *Service) ReturnSoldSeat(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	if params.OrderID == "" {
+		return 0, ErrInvalidSeatAction
+	}
+
+	return s.repository.ReturnSoldSeat(ctx, params)
 }

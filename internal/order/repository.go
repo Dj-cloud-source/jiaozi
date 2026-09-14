@@ -223,6 +223,28 @@ func (r *Repository) CancelExpiredWaitingPayment(ctx context.Context, orderID st
 	return result.RowsAffected()
 }
 
+func (r *Repository) ReturnTicketed(ctx context.Context, orderID string, userID uint64, returnedAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE ticket_orders
+		 SET status = ?,
+		     returned_at = ?
+		 WHERE id = ?
+		   AND user_id = ?
+		   AND status = ?`,
+		"RETURNED",
+		returnedAt,
+		orderID,
+		userID,
+		"TICKETED",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
 func orderViewSelectSQL() string {
 	return `SELECT
 		o.id AS order_id,

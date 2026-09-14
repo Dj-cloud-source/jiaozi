@@ -141,3 +141,23 @@ func (r *Repository) MarkSeatsSold(ctx context.Context, params OrderSeatActionPa
 
 	return result.RowsAffected()
 }
+
+func (r *Repository) ReturnSoldSeat(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE seats
+		 SET status = ?,
+		     locked_order_id = NULL,
+		     locked_at = NULL
+		 WHERE status = ?
+		   AND locked_order_id = ?`,
+		"AVAILABLE",
+		"SOLD",
+		params.OrderID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

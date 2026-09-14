@@ -57,6 +57,10 @@ func (r *fakeRepository) CancelExpiredWaitingPayment(ctx context.Context, orderI
 	return 1, nil
 }
 
+func (r *fakeRepository) ReturnTicketed(ctx context.Context, orderID string, userID uint64, returnedAt time.Time) (int64, error) {
+	return 1, nil
+}
+
 func TestCreateTicketOrderCreatesWaitingPaymentOrder(t *testing.T) {
 	repository := &fakeRepository{}
 	service := NewService(repository)
@@ -137,6 +141,13 @@ func TestMarkPaymentOrdersTicketedRejectsInvalidRequest(t *testing.T) {
 
 func TestListExpiredWaitingPaymentIDsRejectsInvalidRequest(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).ListExpiredWaitingPaymentIDs(context.Background(), time.Now(), 0)
+	if !errors.Is(err, ErrInvalidTicketOrder) {
+		t.Fatalf("expected invalid ticket order error, got %v", err)
+	}
+}
+
+func TestReturnTicketedRejectsInvalidRequest(t *testing.T) {
+	err := NewService(&fakeRepository{}).ReturnTicketed(context.Background(), "", 10001, time.Now())
 	if !errors.Is(err, ErrInvalidTicketOrder) {
 		t.Fatalf("expected invalid ticket order error, got %v", err)
 	}

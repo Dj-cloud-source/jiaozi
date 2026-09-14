@@ -14,6 +14,7 @@ type fakeRepository struct {
 	locked   int64
 	released int64
 	sold     int64
+	returned int64
 }
 
 func (r *fakeRepository) ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error) {
@@ -34,6 +35,10 @@ func (r *fakeRepository) ReleaseSeats(ctx context.Context, params OrderSeatActio
 
 func (r *fakeRepository) MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error) {
 	return r.sold, nil
+}
+
+func (r *fakeRepository) ReturnSoldSeat(ctx context.Context, params OrderSeatActionParams) (int64, error) {
+	return r.returned, nil
 }
 
 func TestListAvailableSeatNosReturnsSeatNos(t *testing.T) {
@@ -126,6 +131,20 @@ func TestMarkSeatsSoldReturnsAffectedRows(t *testing.T) {
 	}
 }
 
+func TestReturnSoldSeatReturnsAffectedRows(t *testing.T) {
+	service := NewService(&fakeRepository{returned: 1})
+
+	returned, err := service.ReturnSoldSeat(context.Background(), OrderSeatActionParams{
+		OrderID: "order-001",
+	})
+	if err != nil {
+		t.Fatalf("return sold seat failed: %v", err)
+	}
+	if returned != 1 {
+		t.Fatalf("expected 1 returned seat, got %d", returned)
+	}
+}
+
 func TestOrderSeatActionsRejectEmptyOrderID(t *testing.T) {
 	service := NewService(&fakeRepository{})
 
@@ -135,6 +154,11 @@ func TestOrderSeatActionsRejectEmptyOrderID(t *testing.T) {
 	}
 
 	_, err = service.MarkSeatsSold(context.Background(), OrderSeatActionParams{})
+	if !errors.Is(err, ErrInvalidSeatAction) {
+		t.Fatalf("expected invalid seat action error, got %v", err)
+	}
+
+	_, err = service.ReturnSoldSeat(context.Background(), OrderSeatActionParams{})
 	if !errors.Is(err, ErrInvalidSeatAction) {
 		t.Fatalf("expected invalid seat action error, got %v", err)
 	}
