@@ -37,6 +37,14 @@ func (r *fakeRepository) FindByIDAndUser(ctx context.Context, orderID string, us
 	return r.detail, nil
 }
 
+func (r *fakeRepository) AdminList(ctx context.Context, query AdminOrderQuery) ([]OrderView, error) {
+	return r.orders, nil
+}
+
+func (r *fakeRepository) AdminFindByID(ctx context.Context, orderID string) (OrderView, error) {
+	return r.detail, nil
+}
+
 func (r *fakeRepository) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error) {
 	return 1, nil
 }
@@ -128,6 +136,13 @@ func TestListByUserReturnsOrders(t *testing.T) {
 
 func TestDetailRejectsInvalidRequest(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Detail(context.Background(), "", 10001)
+	if !errors.Is(err, ErrInvalidTicketOrder) {
+		t.Fatalf("expected invalid ticket order error, got %v", err)
+	}
+}
+
+func TestAdminDetailRejectsInvalidRequest(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).AdminDetail(context.Background(), "")
 	if !errors.Is(err, ErrInvalidTicketOrder) {
 		t.Fatalf("expected invalid ticket order error, got %v", err)
 	}

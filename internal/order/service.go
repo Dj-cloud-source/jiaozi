@@ -12,6 +12,8 @@ type repository interface {
 	Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error)
 	ListByUser(ctx context.Context, userID uint64) ([]OrderView, error)
 	FindByIDAndUser(ctx context.Context, orderID string, userID uint64) (OrderView, error)
+	AdminList(ctx context.Context, query AdminOrderQuery) ([]OrderView, error)
+	AdminFindByID(ctx context.Context, orderID string) (OrderView, error)
 	CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error)
 	ListWaitingPaymentIDsByPayment(ctx context.Context, paymentID string, userID uint64) ([]string, error)
 	MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time) (int64, error)
@@ -91,6 +93,28 @@ func (s *Service) Detail(ctx context.Context, orderID string, userID uint64) (Or
 	}
 
 	return s.repository.FindByIDAndUser(ctx, orderID, userID)
+}
+
+func (s *Service) AdminList(ctx context.Context, query AdminOrderQuery) ([]OrderView, error) {
+	if query.Page <= 0 {
+		query.Page = 1
+	}
+	if query.PageSize <= 0 {
+		query.PageSize = 20
+	}
+	if query.PageSize > 100 {
+		query.PageSize = 100
+	}
+
+	return s.repository.AdminList(ctx, query)
+}
+
+func (s *Service) AdminDetail(ctx context.Context, orderID string) (OrderView, error) {
+	if orderID == "" {
+		return OrderView{}, ErrInvalidTicketOrder
+	}
+
+	return s.repository.AdminFindByID(ctx, orderID)
 }
 
 func (s *Service) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) error {

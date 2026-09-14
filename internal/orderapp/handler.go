@@ -3,6 +3,7 @@ package orderapp
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -158,6 +159,38 @@ func (h *Handler) Return(c *gin.Context) {
 	c.JSON(http.StatusOK, httpserver.Success(NewReturnOrderResponse(result)))
 }
 
+func (h *Handler) AdminList(c *gin.Context) {
+	orders, err := h.service.AdminListOrders(c.Request.Context(), order.AdminOrderQuery{
+		Status:   c.Query("status"),
+		TrainNo:  c.Query("train_no"),
+		Page:     parseIntQuery(c.Query("page")),
+		PageSize: parseIntQuery(c.Query("page_size")),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewAdminOrderListResponse(orders)))
+}
+
+func (h *Handler) AdminDetail(c *gin.Context) {
+	orderView, err := h.service.AdminOrderDetail(c.Request.Context(), c.Param("order_id"))
+	if err != nil {
+		switch {
+		case errors.Is(err, order.ErrInvalidTicketOrder):
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		case errors.Is(err, order.ErrOrderNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(43004, "order not found"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewAdminOrderDetailResponse(orderView)))
+}
+
 func currentUserID(c *gin.Context) (uint64, bool) {
 	value, exists := c.Get(auth.ContextUserIDKey)
 	if !exists {
@@ -166,4 +199,9 @@ func currentUserID(c *gin.Context) (uint64, bool) {
 
 	userID, ok := value.(uint64)
 	return userID, ok
+}
+
+func parseIntQuery(value string) int {
+	parsed, _ := strconv.Atoi(value)
+	return parsed
 }

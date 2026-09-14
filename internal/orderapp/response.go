@@ -160,6 +160,62 @@ func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
 	}
 }
 
+type AdminOrderDetailResponse struct {
+	OrderID          string            `json:"order_id"`
+	UserID           uint64            `json:"user_id"`
+	TrainID          uint64            `json:"train_id"`
+	TrainNo          string            `json:"train_no"`
+	DepartureStation string            `json:"departure_station"`
+	ArrivalStation   string            `json:"arrival_station"`
+	DepartureTime    string            `json:"departure_time"`
+	Passenger         AdminPassenger    `json:"passenger"`
+	SeatClass        string            `json:"seat_class"`
+	SeatNo           uint64            `json:"seat_no"`
+	TicketPrice      string            `json:"ticket_price"`
+	Status           string            `json:"status"`
+	PaymentDeadline  string            `json:"payment_deadline"`
+	CreatedAt        string            `json:"created_at"`
+	TicketedAt        *string           `json:"ticketed_at"`
+	CancelledAt      *string           `json:"cancelled_at"`
+	ReturnedAt       *string           `json:"returned_at"`
+	CompletedAt      *string           `json:"completed_at"`
+}
+
+type AdminPassenger struct {
+	Name   string `json:"name"`
+	IDCard string `json:"id_card"`
+}
+
+func NewAdminOrderListResponse(orders []order.OrderView) []OrderListItemResponse {
+	return NewOrderListResponse(orders)
+}
+
+func NewAdminOrderDetailResponse(orderView order.OrderView) AdminOrderDetailResponse {
+	return AdminOrderDetailResponse{
+		OrderID:          orderView.OrderID,
+		UserID:           orderView.UserID,
+		TrainID:          orderView.TrainID,
+		TrainNo:          orderView.TrainNo,
+		DepartureStation: orderView.DepartureStationName,
+		ArrivalStation:   orderView.ArrivalStationName,
+		DepartureTime:    formatTime(orderView.DepartureTime),
+		Passenger: AdminPassenger{
+			Name:   orderView.PassengerName,
+			IDCard: orderView.PassengerIDCard,
+		},
+		SeatClass:       orderView.SeatClass,
+		SeatNo:          orderView.SeatNo,
+		TicketPrice:     orderView.TicketPrice,
+		Status:          orderView.Status,
+		PaymentDeadline: formatTime(orderView.PaymentDeadline),
+		CreatedAt:       formatTime(orderView.CreatedAt),
+		TicketedAt:       formatOptionalTime(orderView.TicketedAt),
+		CancelledAt:     formatOptionalTime(orderView.CancelledAt),
+		ReturnedAt:      formatOptionalTime(orderView.ReturnedAt),
+		CompletedAt:     formatOptionalTime(orderView.CompletedAt),
+	}
+}
+
 func formatTime(value time.Time) string {
 	return value.Format("2006-01-02T15:04:05-07:00")
 }

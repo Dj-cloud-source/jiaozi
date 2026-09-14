@@ -33,6 +33,8 @@ type OrderHandler interface {
 	Detail(*gin.Context)
 	Cancel(*gin.Context)
 	Return(*gin.Context)
+	AdminList(*gin.Context)
+	AdminDetail(*gin.Context)
 }
 
 type PaymentHandler interface {
@@ -68,6 +70,8 @@ func NewRouter(
 	admin.POST("/stations", stationHandler.Create)
 	admin.POST("/trains", trainHandler.Create)
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)
+	admin.GET("/orders", orderHandler.AdminList)
+	admin.GET("/orders/:order_id", orderHandler.AdminDetail)
 
 	users := api.Group("/users")
 	users.Use(authMiddleware)

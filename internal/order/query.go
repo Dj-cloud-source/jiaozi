@@ -23,3 +23,10 @@ type OrderView struct {
 	ReturnedAt           *time.Time `db:"returned_at"`
 	CompletedAt          *time.Time `db:"completed_at"`
 }
+
+type AdminOrderQuery struct {
+	Status   string
+	TrainNo  string
+	Page     int
+	PageSize int
+}

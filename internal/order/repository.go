@@ -111,6 +111,53 @@ func (r *Repository) FindByIDAndUser(ctx context.Context, orderID string, userID
 	return orderView, nil
 }
 
+func (r *Repository) AdminList(ctx context.Context, query AdminOrderQuery) ([]OrderView, error) {
+	sqlQuery := orderViewSelectSQL()
+	args := []interface{}{}
+
+	if query.Status != "" || query.TrainNo != "" {
+		sqlQuery += ` WHERE 1 = 1`
+		if query.Status != "" {
+			sqlQuery += ` AND o.status = ?`
+			args = append(args, query.Status)
+		}
+		if query.TrainNo != "" {
+			sqlQuery += ` AND t.train_no = ?`
+			args = append(args, query.TrainNo)
+		}
+	}
+
+	sqlQuery += ` ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, query.PageSize, (query.Page-1)*query.PageSize)
+
+	var orders []OrderView
+	err := r.executor.SelectContext(ctx, &orders, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (r *Repository) AdminFindByID(ctx context.Context, orderID string) (OrderView, error) {
+	var orderView OrderView
+	err := r.executor.GetContext(
+		ctx,
+		&orderView,
+		orderViewSelectSQL()+`
+		 WHERE o.id = ?`,
+		orderID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return OrderView{}, ErrOrderNotFound
+		}
+		return OrderView{}, err
+	}
+
+	return orderView, nil
+}
+
 func (r *Repository) CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error) {
 	result, err := r.executor.ExecContext(
 		ctx,

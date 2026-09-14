@@ -194,6 +194,14 @@ func (s *Service) OrderDetail(ctx context.Context, orderID string, userID uint64
 	return order.NewService(s.orderRepository).Detail(ctx, orderID, userID)
 }
 
+func (s *Service) AdminListOrders(ctx context.Context, query order.AdminOrderQuery) ([]order.OrderView, error) {
+	return order.NewService(s.orderRepository).AdminList(ctx, query)
+}
+
+func (s *Service) AdminOrderDetail(ctx context.Context, orderID string) (order.OrderView, error) {
+	return order.NewService(s.orderRepository).AdminDetail(ctx, orderID)
+}
+
 type CancelOrderResult struct {
 	OrderID string
 	Status  string
