@@ -22,6 +22,10 @@ type OrderView struct {
 	CancelledAt          *time.Time `db:"cancelled_at"`
 	ReturnedAt           *time.Time `db:"returned_at"`
 	CompletedAt          *time.Time `db:"completed_at"`
+	PaymentID            *string    `db:"payment_id"`
+	PaymentStatus        *string    `db:"payment_status"`
+	PaymentPayableAmount *string    `db:"payment_payable_amount"`
+	PaymentProvider      *string    `db:"payment_provider"`
 }
 
 type AdminOrderQuery struct {

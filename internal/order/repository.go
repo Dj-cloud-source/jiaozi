@@ -355,11 +355,17 @@ func orderViewSelectSQL() string {
 		o.ticketed_at,
 		o.cancelled_at,
 		o.returned_at,
-		o.completed_at
+		o.completed_at,
+		pay.id AS payment_id,
+		pay.status AS payment_status,
+		CAST(pay.payable_amount AS CHAR) AS payment_payable_amount,
+		pay.provider AS payment_provider
 	FROM ticket_orders o
 	JOIN trains t ON t.id = o.train_id
 	JOIN stations ds ON ds.id = t.departure_station_id
 	JOIN stations asn ON asn.id = t.arrival_station_id
 	JOIN passengers p ON p.id = o.passenger_id
-	JOIN seats s ON s.id = o.seat_id`
+	JOIN seats s ON s.id = o.seat_id
+	LEFT JOIN payment_orders po ON po.order_id = o.id
+	LEFT JOIN payments pay ON pay.id = po.payment_id`
 }

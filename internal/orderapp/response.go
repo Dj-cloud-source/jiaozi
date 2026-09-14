@@ -109,6 +109,14 @@ type OrderDetailResponse struct {
 	CancelledAt      *string           `json:"cancelled_at"`
 	ReturnedAt       *string           `json:"returned_at"`
 	CompletedAt      *string           `json:"completed_at"`
+	Payment          *OrderPayment     `json:"payment"`
+}
+
+type OrderPayment struct {
+	PaymentID     string `json:"payment_id"`
+	Status        string `json:"status"`
+	PayableAmount string `json:"payable_amount"`
+	Provider      string `json:"provider"`
 }
 
 type CancelOrderResponse struct {
@@ -157,6 +165,7 @@ func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
 		CancelledAt:     formatOptionalTime(orderView.CancelledAt),
 		ReturnedAt:      formatOptionalTime(orderView.ReturnedAt),
 		CompletedAt:     formatOptionalTime(orderView.CompletedAt),
+		Payment:         newOrderPayment(orderView),
 	}
 }
 
@@ -179,6 +188,7 @@ type AdminOrderDetailResponse struct {
 	CancelledAt      *string           `json:"cancelled_at"`
 	ReturnedAt       *string           `json:"returned_at"`
 	CompletedAt      *string           `json:"completed_at"`
+	Payment          *OrderPayment     `json:"payment"`
 }
 
 type AdminPassenger struct {
@@ -213,7 +223,29 @@ func NewAdminOrderDetailResponse(orderView order.OrderView) AdminOrderDetailResp
 		CancelledAt:     formatOptionalTime(orderView.CancelledAt),
 		ReturnedAt:      formatOptionalTime(orderView.ReturnedAt),
 		CompletedAt:     formatOptionalTime(orderView.CompletedAt),
+		Payment:         newOrderPayment(orderView),
 	}
+}
+
+func newOrderPayment(orderView order.OrderView) *OrderPayment {
+	if orderView.PaymentID == nil {
+		return nil
+	}
+
+	payment := OrderPayment{
+		PaymentID: *orderView.PaymentID,
+	}
+	if orderView.PaymentStatus != nil {
+		payment.Status = *orderView.PaymentStatus
+	}
+	if orderView.PaymentPayableAmount != nil {
+		payment.PayableAmount = *orderView.PaymentPayableAmount
+	}
+	if orderView.PaymentProvider != nil {
+		payment.Provider = *orderView.PaymentProvider
+	}
+
+	return &payment
 }
 
 func formatTime(value time.Time) string {
