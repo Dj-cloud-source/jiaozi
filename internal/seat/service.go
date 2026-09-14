@@ -1,9 +1,14 @@
 package seat
 
-import "context"
+import (
+	"context"
+
+	"jiaozi/internal/model"
+)
 
 type repository interface {
 	ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error)
+	ListAvailableSeats(ctx context.Context, trainID uint64, seatClass string) ([]model.Seat, error)
 	LockSeats(ctx context.Context, params LockSeatsParams) (int64, error)
 	ReleaseSeats(ctx context.Context, params OrderSeatActionParams) (int64, error)
 	MarkSeatsSold(ctx context.Context, params OrderSeatActionParams) (int64, error)
@@ -19,6 +24,14 @@ func NewService(repository repository) *Service {
 
 func (s *Service) ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error) {
 	return s.repository.ListAvailableSeatNos(ctx, trainID, seatClass)
+}
+
+func (s *Service) ListAvailableSeats(ctx context.Context, trainID uint64, seatClass string) ([]model.Seat, error) {
+	if trainID == 0 || seatClass == "" {
+		return nil, ErrInvalidSeatLock
+	}
+
+	return s.repository.ListAvailableSeats(ctx, trainID, seatClass)
 }
 
 func (s *Service) LockSeats(ctx context.Context, params LockSeatsParams) (int64, error) {

@@ -17,6 +17,7 @@ type Service struct {
 }
 
 type CreateTicketOrderRequest struct {
+	ID              string
 	UserID          uint64
 	PassengerID     uint64
 	TrainID         uint64
@@ -40,9 +41,13 @@ func (s *Service) Create(ctx context.Context, req CreateTicketOrderRequest) (mod
 		return model.TicketOrder{}, ErrInvalidTicketOrder
 	}
 
-	id, err := common.NewUUID()
-	if err != nil {
-		return model.TicketOrder{}, err
+	id := req.ID
+	if id == "" {
+		generatedID, err := common.NewUUID()
+		if err != nil {
+			return model.TicketOrder{}, err
+		}
+		id = generatedID
 	}
 
 	return s.repository.Create(ctx, CreateTicketOrderParams{

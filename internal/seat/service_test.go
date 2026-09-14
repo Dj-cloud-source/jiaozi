@@ -4,17 +4,24 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"jiaozi/internal/model"
 )
 
 type fakeRepository struct {
-	seatNos []uint64
-	locked  int64
+	seatNos  []uint64
+	seats    []model.Seat
+	locked   int64
 	released int64
 	sold     int64
 }
 
 func (r *fakeRepository) ListAvailableSeatNos(ctx context.Context, trainID uint64, seatClass string) ([]uint64, error) {
 	return r.seatNos, nil
+}
+
+func (r *fakeRepository) ListAvailableSeats(ctx context.Context, trainID uint64, seatClass string) ([]model.Seat, error) {
+	return r.seats, nil
 }
 
 func (r *fakeRepository) LockSeats(ctx context.Context, params LockSeatsParams) (int64, error) {
@@ -40,6 +47,25 @@ func TestListAvailableSeatNosReturnsSeatNos(t *testing.T) {
 	}
 
 	assertSeatNos(t, seatNos, []uint64{1, 2, 3})
+}
+
+func TestListAvailableSeatsReturnsSeats(t *testing.T) {
+	service := NewService(&fakeRepository{
+		seats: []model.Seat{
+			{ID: 11, TrainID: 10001, SeatClass: "SECOND_CLASS", SeatNo: 1, Status: "AVAILABLE"},
+		},
+	})
+
+	seats, err := service.ListAvailableSeats(context.Background(), 10001, "SECOND_CLASS")
+	if err != nil {
+		t.Fatalf("list available seats failed: %v", err)
+	}
+	if len(seats) != 1 {
+		t.Fatalf("expected 1 seat, got %d", len(seats))
+	}
+	if seats[0].ID != 11 {
+		t.Fatalf("expected seat id 11, got %d", seats[0].ID)
+	}
 }
 
 func TestLockSeatsReturnsAffectedRows(t *testing.T) {

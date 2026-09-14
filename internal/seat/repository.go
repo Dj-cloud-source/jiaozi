@@ -6,6 +6,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"jiaozi/internal/model"
 	"jiaozi/internal/platform/database"
 )
 
@@ -41,6 +42,36 @@ func (r *Repository) ListAvailableSeatNos(ctx context.Context, trainID uint64, s
 	}
 
 	return seatNos, nil
+}
+
+func (r *Repository) ListAvailableSeats(ctx context.Context, trainID uint64, seatClass string) ([]model.Seat, error) {
+	var seats []model.Seat
+	err := r.executor.SelectContext(
+		ctx,
+		&seats,
+		`SELECT id,
+		        train_id,
+		        seat_class,
+		        seat_no,
+		        status,
+		        locked_order_id,
+		        locked_at,
+		        created_at,
+		        updated_at
+		 FROM seats
+		 WHERE train_id = ?
+		   AND seat_class = ?
+		   AND status = ?
+		 ORDER BY seat_no ASC`,
+		trainID,
+		seatClass,
+		"AVAILABLE",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return seats, nil
 }
 
 func (r *Repository) LockSeats(ctx context.Context, params LockSeatsParams) (int64, error) {
