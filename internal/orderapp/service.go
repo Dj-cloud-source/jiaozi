@@ -17,6 +17,7 @@ import (
 )
 
 const paymentWindow = 10 * time.Minute
+const expiredOrderBatchSize = 100
 
 type Service struct {
 	db                  *sqlx.DB
@@ -235,6 +236,49 @@ func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64
 		OrderID: orderID,
 		Status:  "CANCELLED",
 	}, nil
+}
+
+func (s *Service) CancelExpiredOrders(ctx context.Context, now time.Time) (int64, error) {
+	orderService := order.NewService(s.orderRepository)
+	orderIDs, err := orderService.ListExpiredWaitingPaymentIDs(ctx, now, expiredOrderBatchSize)
+	if err != nil {
+		return 0, err
+	}
+
+	var cancelled int64
+	for _, orderID := range orderIDs {
+		if err := s.cancelExpiredOrder(ctx, orderID, now); err != nil {
+			return cancelled, err
+		}
+		cancelled++
+	}
+
+	return cancelled, nil
+}
+
+func (s *Service) cancelExpiredOrder(ctx context.Context, orderID string, now time.Time) error {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
+	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+
+	if err := orderService.CancelExpiredWaitingPayment(ctx, orderID, now); err != nil {
+		return err
+	}
+
+	released, err := seatService.ReleaseSeats(ctx, seat.OrderSeatActionParams{OrderID: orderID})
+	if err != nil {
+		return err
+	}
+	if released != 1 {
+		return ErrSeatReleaseFailed
+	}
+
+	return tx.Commit()
 }
 
 func priceForSeatClass(trainView train.TrainView, seatClass string) (string, error) {

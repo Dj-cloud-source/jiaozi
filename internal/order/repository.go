@@ -179,6 +179,50 @@ func (r *Repository) MarkPaymentOrdersTicketed(ctx context.Context, paymentID st
 	return result.RowsAffected()
 }
 
+func (r *Repository) ListExpiredWaitingPaymentIDs(ctx context.Context, query ExpiredOrderQuery) ([]string, error) {
+	var orderIDs []string
+	err := r.executor.SelectContext(
+		ctx,
+		&orderIDs,
+		`SELECT id
+		 FROM ticket_orders
+		 WHERE status = ?
+		   AND payment_deadline <= ?
+		 ORDER BY payment_deadline ASC
+		 LIMIT ?`,
+		"WAITING_PAYMENT",
+		query.Now,
+		query.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return orderIDs, nil
+}
+
+func (r *Repository) CancelExpiredWaitingPayment(ctx context.Context, orderID string, cancelledAt time.Time) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE ticket_orders
+		 SET status = ?,
+		     cancelled_at = ?
+		 WHERE id = ?
+		   AND status = ?
+		   AND payment_deadline <= ?`,
+		"CANCELLED",
+		cancelledAt,
+		orderID,
+		"WAITING_PAYMENT",
+		cancelledAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
 func orderViewSelectSQL() string {
 	return `SELECT
 		o.id AS order_id,

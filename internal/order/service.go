@@ -15,6 +15,8 @@ type repository interface {
 	CancelWaitingPayment(ctx context.Context, orderID string, userID uint64, cancelledAt time.Time) (int64, error)
 	ListWaitingPaymentIDsByPayment(ctx context.Context, paymentID string, userID uint64) ([]string, error)
 	MarkPaymentOrdersTicketed(ctx context.Context, paymentID string, userID uint64, ticketedAt time.Time) (int64, error)
+	ListExpiredWaitingPaymentIDs(ctx context.Context, query ExpiredOrderQuery) ([]string, error)
+	CancelExpiredWaitingPayment(ctx context.Context, orderID string, cancelledAt time.Time) (int64, error)
 }
 
 type Service struct {
@@ -122,6 +124,33 @@ func (s *Service) MarkPaymentOrdersTicketed(ctx context.Context, paymentID strin
 		return err
 	}
 	if affected != int64(expectedCount) {
+		return ErrOrderStatusInvalid
+	}
+
+	return nil
+}
+
+func (s *Service) ListExpiredWaitingPaymentIDs(ctx context.Context, now time.Time, limit int) ([]string, error) {
+	if now.IsZero() || limit <= 0 {
+		return nil, ErrInvalidTicketOrder
+	}
+
+	return s.repository.ListExpiredWaitingPaymentIDs(ctx, ExpiredOrderQuery{
+		Now:   now,
+		Limit: limit,
+	})
+}
+
+func (s *Service) CancelExpiredWaitingPayment(ctx context.Context, orderID string, cancelledAt time.Time) error {
+	if orderID == "" || cancelledAt.IsZero() {
+		return ErrInvalidTicketOrder
+	}
+
+	affected, err := s.repository.CancelExpiredWaitingPayment(ctx, orderID, cancelledAt)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
 		return ErrOrderStatusInvalid
 	}
 
