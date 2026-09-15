@@ -158,7 +158,8 @@ func (r *Repository) StartPay(ctx context.Context, paymentID string, userID uint
 		 SET status = ?
 		 WHERE id = ?
 		   AND user_id = ?
-		   AND status IN (?, ?)`,
+		   AND status IN (?, ?)
+		   AND payable_amount > 0`,
 		"PAYING",
 		paymentID,
 		userID,
