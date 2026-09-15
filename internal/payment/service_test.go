@@ -57,6 +57,10 @@ func (r *fakeRepository) AddRefundedAmountForOrder(ctx context.Context, orderID 
 	return 1, nil
 }
 
+func (r *fakeRepository) SubtractPayableAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error) {
+	return 1, nil
+}
+
 func TestCreatePaymentCreatesUnpaidMockPayment(t *testing.T) {
 	repository := &fakeRepository{}
 	service := NewService(repository)
@@ -143,6 +147,13 @@ func TestMarkFailedRejectsInvalidRequest(t *testing.T) {
 
 func TestAddRefundedAmountForOrderRejectsInvalidRequest(t *testing.T) {
 	err := NewService(&fakeRepository{}).AddRefundedAmountForOrder(context.Background(), "order-001", 10001, "abc")
+	if !errors.Is(err, ErrInvalidPayment) {
+		t.Fatalf("expected invalid payment error, got %v", err)
+	}
+}
+
+func TestSubtractPayableAmountForOrderRejectsInvalidRequest(t *testing.T) {
+	err := NewService(&fakeRepository{}).SubtractPayableAmountForOrder(context.Background(), "order-001", 10001, "abc")
 	if !errors.Is(err, ErrInvalidPayment) {
 		t.Fatalf("expected invalid payment error, got %v", err)
 	}

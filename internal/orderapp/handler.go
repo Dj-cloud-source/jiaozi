@@ -122,6 +122,8 @@ func (h *Handler) Cancel(c *gin.Context) {
 			c.JSON(http.StatusNotFound, httpserver.Error(43004, "order not found"))
 		case errors.Is(err, order.ErrOrderStatusInvalid):
 			c.JSON(http.StatusConflict, httpserver.Error(43005, "order cannot be cancelled"))
+		case errors.Is(err, payment.ErrPaymentStatusInvalid):
+			c.JSON(http.StatusConflict, httpserver.Error(44002, "payment status invalid"))
 		case errors.Is(err, ErrSeatReleaseFailed):
 			c.JSON(http.StatusConflict, httpserver.Error(43006, "seat release failed"))
 		default:

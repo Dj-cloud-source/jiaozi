@@ -17,6 +17,7 @@ type repository interface {
 	MarkSuccess(ctx context.Context, paymentID string, userID uint64, paidAt time.Time) (int64, error)
 	MarkFailed(ctx context.Context, paymentID string, userID uint64) (int64, error)
 	AddRefundedAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error)
+	SubtractPayableAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error)
 }
 
 type Service struct {
@@ -145,6 +146,22 @@ func (s *Service) AddRefundedAmountForOrder(ctx context.Context, orderID string,
 	}
 
 	affected, err := s.repository.AddRefundedAmountForOrder(ctx, orderID, userID, amount)
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrPaymentStatusInvalid
+	}
+
+	return nil
+}
+
+func (s *Service) SubtractPayableAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) error {
+	if orderID == "" || userID == 0 || amount == "" || !common.IsMoney(amount) {
+		return ErrInvalidPayment
+	}
+
+	affected, err := s.repository.SubtractPayableAmountForOrder(ctx, orderID, userID, amount)
 	if err != nil {
 		return err
 	}

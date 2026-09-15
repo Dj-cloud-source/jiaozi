@@ -243,6 +243,10 @@ func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64
 		return CancelOrderResult{}, ErrSeatReleaseFailed
 	}
 
+	if err := paymentService.SubtractPayableAmountForOrder(ctx, orderID, userID, orderView.TicketPrice); err != nil {
+		return CancelOrderResult{}, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return CancelOrderResult{}, err
 	}

@@ -235,3 +235,28 @@ func (r *Repository) AddRefundedAmountForOrder(ctx context.Context, orderID stri
 
 	return result.RowsAffected()
 }
+
+func (r *Repository) SubtractPayableAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE payments p
+		 JOIN payment_orders po ON po.payment_id = p.id
+		 JOIN ticket_orders o ON o.id = po.order_id
+		 SET p.payable_amount = p.payable_amount - ?
+		 WHERE o.id = ?
+		   AND o.user_id = ?
+		   AND p.status IN (?, ?)
+		   AND p.payable_amount >= ?`,
+		amount,
+		orderID,
+		userID,
+		"UNPAID",
+		"FAILED",
+		amount,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
