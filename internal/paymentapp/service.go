@@ -133,7 +133,7 @@ func (s *Service) MockSuccess(ctx context.Context, paymentID string, userID uint
 		return MockSuccessResult{}, err
 	}
 
-	paymentModel, err := payment.NewService(s.paymentRepository).Detail(ctx, paymentID, userID)
+	paymentModel, err = payment.NewService(s.paymentRepository).Detail(ctx, paymentID, userID)
 	if err != nil {
 		return MockSuccessResult{}, err
 	}

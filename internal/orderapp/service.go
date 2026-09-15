@@ -266,6 +266,7 @@ func (s *Service) ReturnOrder(ctx context.Context, orderID string, userID uint64
 
 	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
 	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+	paymentService := payment.NewService(s.paymentRepository.WithExecutor(tx))
 
 	orderView, err := orderService.Detail(ctx, orderID, userID)
 	if err != nil {
