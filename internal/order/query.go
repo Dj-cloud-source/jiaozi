@@ -10,6 +10,7 @@ type OrderView struct {
 	DepartureStationName string     `db:"departure_station_name"`
 	ArrivalStationName   string     `db:"arrival_station_name"`
 	DepartureTime        time.Time  `db:"departure_time"`
+	ArrivalTime          time.Time  `db:"arrival_time"`
 	PassengerName        string     `db:"passenger_name"`
 	PassengerIDCard      string     `db:"passenger_id_card"`
 	SeatClass            string     `db:"seat_class"`

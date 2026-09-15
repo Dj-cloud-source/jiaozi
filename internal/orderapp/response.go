@@ -98,6 +98,7 @@ type OrderDetailResponse struct {
 	DepartureStation string            `json:"departure_station"`
 	ArrivalStation   string            `json:"arrival_station"`
 	DepartureTime    string            `json:"departure_time"`
+	ArrivalTime      string            `json:"arrival_time"`
 	Passenger         PassengerSnapshot `json:"passenger"`
 	SeatClass        string            `json:"seat_class"`
 	SeatNo           uint64            `json:"seat_no"`
@@ -151,6 +152,7 @@ func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
 		DepartureStation: orderView.DepartureStationName,
 		ArrivalStation:   orderView.ArrivalStationName,
 		DepartureTime:    formatTime(orderView.DepartureTime),
+		ArrivalTime:      formatTime(orderView.ArrivalTime),
 		Passenger: PassengerSnapshot{
 			Name:         orderView.PassengerName,
 			IDCardMasked: maskIDCard(orderView.PassengerIDCard),
@@ -177,6 +179,7 @@ type AdminOrderDetailResponse struct {
 	DepartureStation string            `json:"departure_station"`
 	ArrivalStation   string            `json:"arrival_station"`
 	DepartureTime    string            `json:"departure_time"`
+	ArrivalTime      string            `json:"arrival_time"`
 	Passenger         AdminPassenger    `json:"passenger"`
 	SeatClass        string            `json:"seat_class"`
 	SeatNo           uint64            `json:"seat_no"`
@@ -209,6 +212,7 @@ func NewAdminOrderDetailResponse(orderView order.OrderView) AdminOrderDetailResp
 		DepartureStation: orderView.DepartureStationName,
 		ArrivalStation:   orderView.ArrivalStationName,
 		DepartureTime:    formatTime(orderView.DepartureTime),
+		ArrivalTime:      formatTime(orderView.ArrivalTime),
 		Passenger: AdminPassenger{
 			Name:   orderView.PassengerName,
 			IDCard: orderView.PassengerIDCard,

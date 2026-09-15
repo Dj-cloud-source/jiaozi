@@ -344,6 +344,7 @@ func orderViewSelectSQL() string {
 		ds.name AS departure_station_name,
 		asn.name AS arrival_station_name,
 		t.departure_time,
+		t.arrival_time,
 		p.name AS passenger_name,
 		p.id_card AS passenger_id_card,
 		s.seat_class,
