@@ -67,8 +67,12 @@ func (s *Service) Detail(ctx context.Context, paymentID string, userID uint64) (
 
 func (s *Service) StartPay(ctx context.Context, paymentID string, userID uint64) (model.Payment, error) {
 	paymentService := payment.NewService(s.paymentRepository)
-	if _, err := paymentService.Detail(ctx, paymentID, userID); err != nil {
+	paymentModel, err := paymentService.Detail(ctx, paymentID, userID)
+	if err != nil {
 		return model.Payment{}, err
+	}
+	if !time.Now().Before(paymentModel.PaymentDeadline) {
+		return model.Payment{}, payment.ErrPaymentStatusInvalid
 	}
 
 	if err := paymentService.StartPay(ctx, paymentID, userID); err != nil {
@@ -89,8 +93,14 @@ func (s *Service) MockSuccess(ctx context.Context, paymentID string, userID uint
 	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
 	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
 
-	if _, err := paymentService.Detail(ctx, paymentID, userID); err != nil {
+	paymentModel, err := paymentService.Detail(ctx, paymentID, userID)
+	if err != nil {
 		return MockSuccessResult{}, err
+	}
+
+	paidAt := time.Now()
+	if !paidAt.Before(paymentModel.PaymentDeadline) {
+		return MockSuccessResult{}, payment.ErrPaymentStatusInvalid
 	}
 
 	orderIDs, err := orderService.ListWaitingPaymentIDsByPayment(ctx, paymentID, userID)
@@ -101,7 +111,6 @@ func (s *Service) MockSuccess(ctx context.Context, paymentID string, userID uint
 		return MockSuccessResult{}, order.ErrOrderStatusInvalid
 	}
 
-	paidAt := time.Now()
 	if err := paymentService.MarkSuccess(ctx, paymentID, userID, paidAt); err != nil {
 		return MockSuccessResult{}, err
 	}
