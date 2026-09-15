@@ -44,6 +44,10 @@ type PaymentHandler interface {
 	MockFail(*gin.Context)
 }
 
+type TicketHandler interface {
+	Detail(*gin.Context)
+}
+
 func NewRouter(
 	authHandler AuthHandler,
 	authMiddleware gin.HandlerFunc,
@@ -52,6 +56,7 @@ func NewRouter(
 	trainHandler TrainHandler,
 	orderHandler OrderHandler,
 	paymentHandler PaymentHandler,
+	ticketHandler TicketHandler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
@@ -91,6 +96,10 @@ func NewRouter(
 	payments.POST("/:payment_id/pay", paymentHandler.Pay)
 	payments.POST("/:payment_id/mock/success", paymentHandler.MockSuccess)
 	payments.POST("/:payment_id/mock/fail", paymentHandler.MockFail)
+
+	tickets := api.Group("/tickets")
+	tickets.Use(authMiddleware)
+	tickets.GET("/:order_id", ticketHandler.Detail)
 
 	return router
 }
