@@ -10,6 +10,7 @@ import (
 	"jiaozi/internal/auth"
 	"jiaozi/internal/httpserver"
 	"jiaozi/internal/order"
+	"jiaozi/internal/payment"
 	"jiaozi/internal/train"
 )
 
@@ -148,6 +149,8 @@ func (h *Handler) Return(c *gin.Context) {
 			c.JSON(http.StatusNotFound, httpserver.Error(43004, "order not found"))
 		case errors.Is(err, order.ErrOrderStatusInvalid), errors.Is(err, ErrReturnDeadlinePassed):
 			c.JSON(http.StatusConflict, httpserver.Error(43007, "order cannot be returned"))
+		case errors.Is(err, payment.ErrPaymentStatusInvalid):
+			c.JSON(http.StatusConflict, httpserver.Error(44002, "payment status invalid"))
 		case errors.Is(err, ErrSeatReleaseFailed):
 			c.JSON(http.StatusConflict, httpserver.Error(43006, "seat release failed"))
 		default:

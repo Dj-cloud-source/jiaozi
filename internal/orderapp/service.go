@@ -221,6 +221,7 @@ func (s *Service) CancelOrder(ctx context.Context, orderID string, userID uint64
 
 	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
 	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+	paymentService := payment.NewService(s.paymentRepository.WithExecutor(tx))
 
 	orderView, err := orderService.Detail(ctx, orderID, userID)
 	if err != nil {
@@ -285,6 +286,10 @@ func (s *Service) ReturnOrder(ctx context.Context, orderID string, userID uint64
 	}
 	if returned != 1 {
 		return ReturnOrderResult{}, ErrSeatReleaseFailed
+	}
+
+	if err := paymentService.AddRefundedAmountForOrder(ctx, orderID, userID, orderView.TicketPrice); err != nil {
+		return ReturnOrderResult{}, err
 	}
 
 	if err := tx.Commit(); err != nil {
