@@ -351,6 +351,12 @@ func (s *Service) cancelExpiredOrder(ctx context.Context, orderID string, now ti
 
 	orderService := order.NewService(s.orderRepository.WithExecutor(tx))
 	seatService := seat.NewService(s.seatRepository.WithExecutor(tx))
+	paymentService := payment.NewService(s.paymentRepository.WithExecutor(tx))
+
+	orderView, err := orderService.AdminDetail(ctx, orderID)
+	if err != nil {
+		return err
+	}
 
 	if err := orderService.CancelExpiredWaitingPayment(ctx, orderID, now); err != nil {
 		return err
@@ -362,6 +368,10 @@ func (s *Service) cancelExpiredOrder(ctx context.Context, orderID string, now ti
 	}
 	if released != 1 {
 		return ErrSeatReleaseFailed
+	}
+
+	if err := paymentService.SubtractPayableAmountForOrder(ctx, orderID, orderView.UserID, orderView.TicketPrice); err != nil {
+		return err
 	}
 
 	return tx.Commit()
