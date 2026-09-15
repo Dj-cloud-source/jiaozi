@@ -16,6 +16,7 @@ type repository interface {
 	StartPay(ctx context.Context, paymentID string, userID uint64) (int64, error)
 	MarkSuccess(ctx context.Context, paymentID string, userID uint64, paidAt time.Time) (int64, error)
 	MarkFailed(ctx context.Context, paymentID string, userID uint64) (int64, error)
+	MarkPayingFailedByOrder(ctx context.Context, orderID string, userID uint64) (int64, error)
 	AddRefundedAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error)
 	SubtractPayableAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error)
 }
@@ -138,6 +139,15 @@ func (s *Service) MarkFailed(ctx context.Context, paymentID string, userID uint6
 	}
 
 	return nil
+}
+
+func (s *Service) MarkPayingFailedByOrder(ctx context.Context, orderID string, userID uint64) error {
+	if orderID == "" || userID == 0 {
+		return ErrInvalidPayment
+	}
+
+	_, err := s.repository.MarkPayingFailedByOrder(ctx, orderID, userID)
+	return err
 }
 
 func (s *Service) AddRefundedAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) error {

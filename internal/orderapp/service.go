@@ -358,6 +358,10 @@ func (s *Service) cancelExpiredOrder(ctx context.Context, orderID string, now ti
 		return err
 	}
 
+	if err := paymentService.MarkPayingFailedByOrder(ctx, orderID, orderView.UserID); err != nil {
+		return err
+	}
+
 	if err := orderService.CancelExpiredWaitingPayment(ctx, orderID, now); err != nil {
 		return err
 	}

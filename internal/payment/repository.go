@@ -215,6 +215,28 @@ func (r *Repository) MarkFailed(ctx context.Context, paymentID string, userID ui
 	return result.RowsAffected()
 }
 
+func (r *Repository) MarkPayingFailedByOrder(ctx context.Context, orderID string, userID uint64) (int64, error) {
+	result, err := r.executor.ExecContext(
+		ctx,
+		`UPDATE payments p
+		 JOIN payment_orders po ON po.payment_id = p.id
+		 JOIN ticket_orders o ON o.id = po.order_id
+		 SET p.status = ?
+		 WHERE o.id = ?
+		   AND o.user_id = ?
+		   AND p.status = ?`,
+		"FAILED",
+		orderID,
+		userID,
+		"PAYING",
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
 func (r *Repository) AddRefundedAmountForOrder(ctx context.Context, orderID string, userID uint64, amount string) (int64, error) {
 	result, err := r.executor.ExecContext(
 		ctx,
