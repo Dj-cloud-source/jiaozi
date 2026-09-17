@@ -12,6 +12,12 @@ type ListTrainQuery struct {
 	Sort               string
 }
 
+type AdminListTrainQuery struct {
+	TrainNo  string
+	Page     int
+	PageSize int
+}
+
 type TrainView struct {
 	ID                         uint64    `db:"id"`
 	TrainNo                    string    `db:"train_no"`

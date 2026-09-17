@@ -33,7 +33,9 @@ type StationHandler interface {
 
 type TrainHandler interface {
 	Create(*gin.Context)
+	Update(*gin.Context)
 	Publish(*gin.Context)
+	AdminList(*gin.Context)
 	List(*gin.Context)
 	Detail(*gin.Context)
 }
@@ -92,7 +94,9 @@ func NewRouter(
 	admin.POST("/stations", stationHandler.Create)
 	admin.PATCH("/stations/:station_id", stationHandler.Update)
 	admin.POST("/stations/:station_id/disable", stationHandler.Disable)
+	admin.GET("/trains", trainHandler.AdminList)
 	admin.POST("/trains", trainHandler.Create)
+	admin.PATCH("/trains/:train_id", trainHandler.Update)
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)
 	admin.GET("/orders", orderHandler.AdminList)
 	admin.GET("/orders/:order_id", orderHandler.AdminDetail)

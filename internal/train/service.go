@@ -14,9 +14,13 @@ var pricePattern = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 
 type repository interface {
 	Create(ctx context.Context, params CreateTrainParams) (model.Train, error)
+	Update(ctx context.Context, trainID uint64, params CreateTrainParams) (model.Train, error)
 	Publish(ctx context.Context, trainID uint64) (model.Train, error)
 	List(ctx context.Context, query ListTrainQuery) ([]TrainView, error)
+	AdminList(ctx context.Context, query AdminListTrainQuery) ([]TrainView, error)
+	FindByID(ctx context.Context, trainID uint64) (model.Train, error)
 	FindViewByID(ctx context.Context, trainID uint64) (TrainView, error)
+	AdminFindViewByID(ctx context.Context, trainID uint64) (TrainView, error)
 	OpenDueTrains(ctx context.Context, now time.Time) (int64, error)
 	StopDueTrains(ctx context.Context, now time.Time) (int64, error)
 	DepartDueTrains(ctx context.Context, now time.Time) (int64, error)
@@ -53,6 +57,19 @@ func (s *Service) Create(ctx context.Context, req CreateTrainRequest) (model.Tra
 	return s.repository.Create(ctx, params)
 }
 
+func (s *Service) Update(ctx context.Context, trainID uint64, req UpdateTrainRequest) (model.Train, error) {
+	if trainID == 0 {
+		return model.Train{}, ErrTrainNotFound
+	}
+
+	params, err := buildCreateTrainParams(req)
+	if err != nil {
+		return model.Train{}, err
+	}
+
+	return s.repository.Update(ctx, trainID, params)
+}
+
 func (s *Service) Publish(ctx context.Context, trainID uint64) (model.Train, error) {
 	if trainID == 0 {
 		return model.Train{}, ErrTrainNotFound
@@ -70,12 +87,37 @@ func (s *Service) List(ctx context.Context, req ListTrainsRequest) ([]TrainView,
 	return s.repository.List(ctx, query)
 }
 
+func (s *Service) AdminList(ctx context.Context, req AdminListTrainsRequest) ([]TrainView, error) {
+	query, err := buildAdminListTrainQuery(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.AdminList(ctx, query)
+}
+
 func (s *Service) Detail(ctx context.Context, trainID uint64) (TrainView, error) {
 	if trainID == 0 {
 		return TrainView{}, ErrTrainNotFound
 	}
 
 	return s.repository.FindViewByID(ctx, trainID)
+}
+
+func (s *Service) AdminDetail(ctx context.Context, trainID uint64) (TrainView, error) {
+	if trainID == 0 {
+		return TrainView{}, ErrTrainNotFound
+	}
+
+	return s.repository.AdminFindViewByID(ctx, trainID)
+}
+
+func (s *Service) AdminModelDetail(ctx context.Context, trainID uint64) (model.Train, error) {
+	if trainID == 0 {
+		return model.Train{}, ErrTrainNotFound
+	}
+
+	return s.repository.FindByID(ctx, trainID)
 }
 
 func (s *Service) OpenDueTrains(ctx context.Context, now time.Time) (int64, error) {
@@ -220,5 +262,31 @@ func buildListTrainQuery(req ListTrainsRequest) (ListTrainQuery, error) {
 		Page:               page,
 		PageSize:           pageSize,
 		Sort:               sort,
+	}, nil
+}
+
+func buildAdminListTrainQuery(req AdminListTrainsRequest) (AdminListTrainQuery, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	trainNo := strings.TrimSpace(req.TrainNo)
+	if trainNo != "" && !trainNoPattern.MatchString(trainNo) {
+		return AdminListTrainQuery{}, ErrInvalidTrain
+	}
+
+	return AdminListTrainQuery{
+		TrainNo:  trainNo,
+		Page:     page,
+		PageSize: pageSize,
 	}, nil
 }

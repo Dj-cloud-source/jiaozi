@@ -42,6 +42,29 @@ func (r *fakeRepository) Create(ctx context.Context, params CreateTrainParams) (
 	}, nil
 }
 
+func (r *fakeRepository) Update(ctx context.Context, trainID uint64, params CreateTrainParams) (model.Train, error) {
+	r.params = params
+	if r.err != nil {
+		return model.Train{}, r.err
+	}
+
+	return model.Train{
+		ID:                   trainID,
+		TrainNo:              params.TrainNo,
+		DepartureDate:        params.DepartureDate,
+		DepartureStationID:   params.DepartureStationID,
+		ArrivalStationID:     params.ArrivalStationID,
+		DepartureTime:        params.DepartureTime,
+		ArrivalTime:          params.ArrivalTime,
+		SaleStartTime:        params.SaleStartTime,
+		FirstClassPrice:      params.FirstClassPrice,
+		SecondClassPrice:     params.SecondClassPrice,
+		FirstClassSeatCount:  params.FirstClassSeatCount,
+		SecondClassSeatCount: params.SecondClassSeatCount,
+		Status:               "DRAFT",
+	}, nil
+}
+
 func (r *fakeRepository) Publish(ctx context.Context, trainID uint64) (model.Train, error) {
 	if r.err != nil {
 		return model.Train{}, r.err
@@ -58,7 +81,33 @@ func (r *fakeRepository) List(ctx context.Context, query ListTrainQuery) ([]Trai
 	return r.trains, nil
 }
 
+func (r *fakeRepository) AdminList(ctx context.Context, query AdminListTrainQuery) ([]TrainView, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.trains, nil
+}
+
 func (r *fakeRepository) FindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
+	if r.err != nil {
+		return TrainView{}, r.err
+	}
+	if len(r.trains) == 0 {
+		return TrainView{}, ErrTrainNotFound
+	}
+	r.trains[0].ID = trainID
+	return r.trains[0], nil
+}
+
+func (r *fakeRepository) FindByID(ctx context.Context, trainID uint64) (model.Train, error) {
+	if r.err != nil {
+		return model.Train{}, r.err
+	}
+	r.train.ID = trainID
+	return r.train, nil
+}
+
+func (r *fakeRepository) AdminFindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
 	if r.err != nil {
 		return TrainView{}, r.err
 	}
@@ -186,6 +235,35 @@ func TestPublishTrainReturnsWaitingSale(t *testing.T) {
 	}
 }
 
+func TestUpdateTrainReturnsDraft(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(repository)
+
+	req := validCreateTrainRequest()
+	req.TrainNo = "G102"
+	train, err := service.Update(context.Background(), 10001, req)
+	if err != nil {
+		t.Fatalf("update train failed: %v", err)
+	}
+
+	if train.ID != 10001 {
+		t.Fatalf("unexpected train id: %d", train.ID)
+	}
+	if train.Status != "DRAFT" {
+		t.Fatalf("unexpected train status: %s", train.Status)
+	}
+	if repository.params.TrainNo != "G102" {
+		t.Fatalf("unexpected train no: %s", repository.params.TrainNo)
+	}
+}
+
+func TestUpdateTrainRejectsZeroID(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).Update(context.Background(), 0, validCreateTrainRequest())
+	if !errors.Is(err, ErrTrainNotFound) {
+		t.Fatalf("expected train not found error, got %v", err)
+	}
+}
+
 func TestPublishTrainRejectsZeroID(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Publish(context.Background(), 0)
 	if !errors.Is(err, ErrTrainNotFound) {
@@ -220,6 +298,32 @@ func TestListTrainsRejectsInvalidSort(t *testing.T) {
 		ArrivalStationID:   2,
 		Date:               "2026-09-20",
 		Sort:               "bad_sort",
+	})
+	if !errors.Is(err, ErrInvalidTrain) {
+		t.Fatalf("expected invalid train error, got %v", err)
+	}
+}
+
+func TestAdminListTrainsAcceptsEmptyQuery(t *testing.T) {
+	service := NewService(&fakeRepository{
+		trains: []TrainView{
+			{ID: 10001, TrainNo: "G101", Status: "DRAFT"},
+			{ID: 10002, TrainNo: "G102", Status: "ARCHIVED"},
+		},
+	})
+
+	trains, err := service.AdminList(context.Background(), AdminListTrainsRequest{})
+	if err != nil {
+		t.Fatalf("admin list trains failed: %v", err)
+	}
+	if len(trains) != 2 {
+		t.Fatalf("expected 2 trains, got %d", len(trains))
+	}
+}
+
+func TestAdminListTrainsRejectsInvalidTrainNo(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).AdminList(context.Background(), AdminListTrainsRequest{
+		TrainNo: "g101",
 	})
 	if !errors.Is(err, ErrInvalidTrain) {
 		t.Fatalf("expected invalid train error, got %v", err)

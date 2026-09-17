@@ -58,7 +58,7 @@ func (h *Handler) Publish(c *gin.Context) {
 		return
 	}
 
-	beforeTrain, err := h.service.Detail(c.Request.Context(), trainID)
+	beforeTrain, err := h.service.AdminDetail(c.Request.Context(), trainID)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrTrainNotFound):
@@ -90,6 +90,55 @@ func (h *Handler) Publish(c *gin.Context) {
 	c.JSON(http.StatusOK, httpserver.Success(NewAdminTrainResponse(train)))
 }
 
+func (h *Handler) Update(c *gin.Context) {
+	trainID, err := strconv.ParseUint(c.Param("train_id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		return
+	}
+
+	var req UpdateTrainRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		return
+	}
+
+	beforeTrain, err := h.service.AdminModelDetail(c.Request.Context(), trainID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrTrainNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(42001, "train not found"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	train, err := h.service.Update(c.Request.Context(), trainID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidTrain):
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+		case errors.Is(err, ErrTrainNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(42001, "train not found"))
+		case errors.Is(err, ErrTrainAlreadyExists):
+			c.JSON(http.StatusConflict, httpserver.Error(42005, "train already exists"))
+		case errors.Is(err, ErrTrainStatusInvalid):
+			c.JSON(http.StatusConflict, httpserver.Error(47002, "admin operation not allowed"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
+	if err := h.writeUpdateTrainAudit(c, beforeTrain, train); err != nil {
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		return
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(NewAdminTrainResponse(train)))
+}
+
 func (h *Handler) List(c *gin.Context) {
 	req := ListTrainsRequest{
 		TrainNo:            c.Query("train_no"),
@@ -102,6 +151,31 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	trains, err := h.service.List(c.Request.Context(), req)
+	if err != nil {
+		if errors.Is(err, ErrInvalidTrain) {
+			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		return
+	}
+
+	response := make([]TrainResponse, 0, len(trains))
+	for _, train := range trains {
+		response = append(response, NewTrainResponse(train))
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(response))
+}
+
+func (h *Handler) AdminList(c *gin.Context) {
+	req := AdminListTrainsRequest{
+		TrainNo:  c.Query("train_no"),
+		Page:     parseIntQuery(c.Query("page")),
+		PageSize: parseIntQuery(c.Query("page_size")),
+	}
+
+	trains, err := h.service.AdminList(c.Request.Context(), req)
 	if err != nil {
 		if errors.Is(err, ErrInvalidTrain) {
 			c.JSON(http.StatusBadRequest, httpserver.Error(40001, "invalid request"))
@@ -187,6 +261,33 @@ func (h *Handler) writeCreateTrainAudit(c *gin.Context, train model.Train) error
 	return err
 }
 
+func (h *Handler) writeUpdateTrainAudit(c *gin.Context, beforeTrain model.Train, afterTrain model.Train) error {
+	adminID, ok := currentAdminID(c)
+	if !ok {
+		return auth.ErrUnauthorized
+	}
+
+	resourceID := strconv.FormatUint(afterTrain.ID, 10)
+	beforeDataJSON, err := marshalTrainAuditData(beforeTrain)
+	if err != nil {
+		return err
+	}
+	afterDataJSON, err := marshalTrainAuditData(afterTrain)
+	if err != nil {
+		return err
+	}
+
+	_, err = h.audit.Create(c.Request.Context(), adminaudit.CreateRequest{
+		AdminID:      adminID,
+		Action:       "UPDATE_TRAIN",
+		ResourceType: "TRAIN",
+		ResourceID:   &resourceID,
+		BeforeData:   &beforeDataJSON,
+		AfterData:    &afterDataJSON,
+	})
+	return err
+}
+
 func (h *Handler) writePublishTrainAudit(c *gin.Context, beforeTrain TrainView, afterTrain model.Train) error {
 	adminID, ok := currentAdminID(c)
 	if !ok {
@@ -223,6 +324,29 @@ func (h *Handler) writePublishTrainAudit(c *gin.Context, beforeTrain TrainView, 
 		AfterData:    &afterDataJSON,
 	})
 	return err
+}
+
+func marshalTrainAuditData(train model.Train) (string, error) {
+	data := map[string]interface{}{
+		"id":                      train.ID,
+		"train_no":                train.TrainNo,
+		"departure_date":          train.DepartureDate.Format("2006-01-02"),
+		"departure_station_id":    train.DepartureStationID,
+		"arrival_station_id":      train.ArrivalStationID,
+		"departure_time":          train.DepartureTime.Format("2006-01-02T15:04:05-07:00"),
+		"arrival_time":            train.ArrivalTime.Format("2006-01-02T15:04:05-07:00"),
+		"sale_start_time":         train.SaleStartTime.Format("2006-01-02T15:04:05-07:00"),
+		"first_class_price":       train.FirstClassPrice,
+		"second_class_price":      train.SecondClassPrice,
+		"first_class_seat_count":  train.FirstClassSeatCount,
+		"second_class_seat_count": train.SecondClassSeatCount,
+		"status":                  train.Status,
+	}
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(dataBytes), nil
 }
 
 func currentAdminID(c *gin.Context) (uint64, bool) {

@@ -14,6 +14,8 @@ type CreateTrainRequest struct {
 	SecondClassSeatCount uint64 `json:"second_class_seat_count"`
 }
 
+type UpdateTrainRequest = CreateTrainRequest
+
 type ListTrainsRequest struct {
 	DepartureStationID uint64
 	ArrivalStationID   uint64
@@ -22,4 +24,10 @@ type ListTrainsRequest struct {
 	Page               int
 	PageSize           int
 	Sort               string
+}
+
+type AdminListTrainsRequest struct {
+	TrainNo  string
+	Page     int
+	PageSize int
 }

@@ -87,6 +87,79 @@ func nullablePrice(price string) interface{} {
 	return price
 }
 
+func (r *Repository) Update(ctx context.Context, trainID uint64, params CreateTrainParams) (model.Train, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return model.Train{}, err
+	}
+	defer tx.Rollback()
+
+	train, err := findTrainForUpdate(ctx, tx, trainID)
+	if err != nil {
+		return model.Train{}, err
+	}
+	if train.Status != "DRAFT" {
+		return model.Train{}, ErrTrainStatusInvalid
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE trains SET
+			train_no = ?,
+			departure_date = ?,
+			departure_station_id = ?,
+			arrival_station_id = ?,
+			departure_time = ?,
+			arrival_time = ?,
+			sale_start_time = ?,
+			first_class_price = ?,
+			second_class_price = ?,
+			first_class_seat_count = ?,
+			second_class_seat_count = ?
+		 WHERE id = ? AND status = ?`,
+		params.TrainNo,
+		params.DepartureDate,
+		params.DepartureStationID,
+		params.ArrivalStationID,
+		params.DepartureTime,
+		params.ArrivalTime,
+		params.SaleStartTime,
+		nullablePrice(params.FirstClassPrice),
+		nullablePrice(params.SecondClassPrice),
+		params.FirstClassSeatCount,
+		params.SecondClassSeatCount,
+		trainID,
+		"DRAFT",
+	)
+	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return model.Train{}, ErrTrainAlreadyExists
+		}
+		return model.Train{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return model.Train{}, err
+	}
+
+	return model.Train{
+		ID:                   trainID,
+		TrainNo:              params.TrainNo,
+		DepartureDate:        params.DepartureDate,
+		DepartureStationID:   params.DepartureStationID,
+		ArrivalStationID:     params.ArrivalStationID,
+		DepartureTime:        params.DepartureTime,
+		ArrivalTime:          params.ArrivalTime,
+		SaleStartTime:        params.SaleStartTime,
+		FirstClassPrice:      params.FirstClassPrice,
+		SecondClassPrice:     params.SecondClassPrice,
+		FirstClassSeatCount:  params.FirstClassSeatCount,
+		SecondClassSeatCount: params.SecondClassSeatCount,
+		Status:               "DRAFT",
+	}, nil
+}
+
 func (r *Repository) Publish(ctx context.Context, trainID uint64) (model.Train, error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -179,6 +252,10 @@ func findTrainForUpdate(ctx context.Context, tx *sqlx.Tx, trainID uint64) (model
 		return model.Train{}, err
 	}
 
+	return trainFromRow(row), nil
+}
+
+func trainFromRow(row trainRow) model.Train {
 	return model.Train{
 		ID:                   row.ID,
 		TrainNo:              row.TrainNo,
@@ -195,7 +272,7 @@ func findTrainForUpdate(ctx context.Context, tx *sqlx.Tx, trainID uint64) (model
 		Status:               row.Status,
 		CreatedAt:            row.CreatedAt,
 		UpdatedAt:            row.UpdatedAt,
-	}, nil
+	}
 }
 
 func createSeats(ctx context.Context, tx *sqlx.Tx, trainID uint64, seatClass string, count uint64) error {
@@ -243,12 +320,88 @@ func (r *Repository) List(ctx context.Context, query ListTrainQuery) ([]TrainVie
 	return trains, nil
 }
 
+func (r *Repository) AdminList(ctx context.Context, query AdminListTrainQuery) ([]TrainView, error) {
+	sqlQuery := trainViewSelectSQL()
+	args := []interface{}{}
+
+	if query.TrainNo != "" {
+		sqlQuery += ` WHERE t.train_no = ?`
+		args = append(args, query.TrainNo)
+	}
+
+	sqlQuery += trainViewGroupBySQL()
+	sqlQuery += ` ORDER BY t.departure_time DESC`
+	sqlQuery += ` LIMIT ? OFFSET ?`
+	args = append(args, query.PageSize, (query.Page-1)*query.PageSize)
+
+	var trains []TrainView
+	err := r.db.SelectContext(ctx, &trains, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return trains, nil
+}
+
+func (r *Repository) FindByID(ctx context.Context, trainID uint64) (model.Train, error) {
+	var row trainRow
+	err := r.db.GetContext(
+		ctx,
+		&row,
+		`SELECT
+			id,
+			train_no,
+			departure_date,
+			departure_station_id,
+			arrival_station_id,
+			departure_time,
+			arrival_time,
+			sale_start_time,
+			first_class_price,
+			second_class_price,
+			first_class_seat_count,
+			second_class_seat_count,
+			status,
+			created_at,
+			updated_at
+		 FROM trains
+		 WHERE id = ?`,
+		trainID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Train{}, ErrTrainNotFound
+		}
+		return model.Train{}, err
+	}
+
+	return trainFromRow(row), nil
+}
+
 func (r *Repository) FindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
 	var train TrainView
 	err := r.db.GetContext(
 		ctx,
 		&train,
 		trainViewSelectSQL()+` WHERE t.id = ? AND t.status IN ('WAITING_SALE', 'ON_SALE', 'STOPPED')`+trainViewGroupBySQL(),
+		trainID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return TrainView{}, ErrTrainNotFound
+		}
+		return TrainView{}, err
+	}
+
+	return train, nil
+}
+
+func (r *Repository) AdminFindViewByID(ctx context.Context, trainID uint64) (TrainView, error) {
+	var train TrainView
+	err := r.db.GetContext(
+		ctx,
+		&train,
+		trainViewSelectSQL()+` WHERE t.id = ?`+trainViewGroupBySQL(),
 		trainID,
 	)
 	if err != nil {
