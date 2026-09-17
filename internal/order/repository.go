@@ -115,11 +115,15 @@ func (r *Repository) AdminList(ctx context.Context, query AdminOrderQuery) ([]Or
 	sqlQuery := orderViewSelectSQL()
 	args := []interface{}{}
 
-	if query.Status != "" || query.TrainNo != "" {
+	if query.Status != "" || query.Phone != "" || query.TrainNo != "" {
 		sqlQuery += ` WHERE 1 = 1`
 		if query.Status != "" {
 			sqlQuery += ` AND o.status = ?`
 			args = append(args, query.Status)
+		}
+		if query.Phone != "" {
+			sqlQuery += ` AND u.phone = ?`
+			args = append(args, query.Phone)
 		}
 		if query.TrainNo != "" {
 			sqlQuery += ` AND t.train_no = ?`
@@ -339,6 +343,8 @@ func orderViewSelectSQL() string {
 	return `SELECT
 		o.id AS order_id,
 		o.user_id,
+		u.phone AS user_phone,
+		u.nickname AS user_nickname,
 		o.train_id,
 		t.train_no,
 		ds.name AS departure_station_name,
@@ -362,6 +368,7 @@ func orderViewSelectSQL() string {
 		CAST(pay.payable_amount AS CHAR) AS payment_payable_amount,
 		pay.provider AS payment_provider
 	FROM ticket_orders o
+	JOIN users u ON u.id = o.user_id
 	JOIN trains t ON t.id = o.train_id
 	JOIN stations ds ON ds.id = t.departure_station_id
 	JOIN stations asn ON asn.id = t.arrival_station_id

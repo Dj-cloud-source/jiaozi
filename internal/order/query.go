@@ -5,6 +5,8 @@ import "time"
 type OrderView struct {
 	OrderID              string     `db:"order_id"`
 	UserID               uint64     `db:"user_id"`
+	UserPhone            string     `db:"user_phone"`
+	UserNickname         string     `db:"user_nickname"`
 	TrainID              uint64     `db:"train_id"`
 	TrainNo              string     `db:"train_no"`
 	DepartureStationName string     `db:"departure_station_name"`
@@ -31,6 +33,7 @@ type OrderView struct {
 
 type AdminOrderQuery struct {
 	Status   string
+	Phone    string
 	TrainNo  string
 	Page     int
 	PageSize int

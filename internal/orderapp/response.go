@@ -173,7 +173,7 @@ func NewOrderDetailResponse(orderView order.OrderView) OrderDetailResponse {
 
 type AdminOrderDetailResponse struct {
 	OrderID          string            `json:"order_id"`
-	UserID           uint64            `json:"user_id"`
+	User             AdminOrderUser    `json:"user"`
 	TrainID          uint64            `json:"train_id"`
 	TrainNo          string            `json:"train_no"`
 	DepartureStation string            `json:"departure_station"`
@@ -199,6 +199,12 @@ type AdminPassenger struct {
 	IDCard string `json:"id_card"`
 }
 
+type AdminOrderUser struct {
+	ID       uint64 `json:"id"`
+	Phone    string `json:"phone"`
+	Nickname string `json:"nickname"`
+}
+
 func NewAdminOrderListResponse(orders []order.OrderView) []OrderListItemResponse {
 	return NewOrderListResponse(orders)
 }
@@ -206,7 +212,11 @@ func NewAdminOrderListResponse(orders []order.OrderView) []OrderListItemResponse
 func NewAdminOrderDetailResponse(orderView order.OrderView) AdminOrderDetailResponse {
 	return AdminOrderDetailResponse{
 		OrderID:          orderView.OrderID,
-		UserID:           orderView.UserID,
+		User: AdminOrderUser{
+			ID:       orderView.UserID,
+			Phone:    orderView.UserPhone,
+			Nickname: orderView.UserNickname,
+		},
 		TrainID:          orderView.TrainID,
 		TrainNo:          orderView.TrainNo,
 		DepartureStation: orderView.DepartureStationName,

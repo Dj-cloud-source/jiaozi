@@ -10,9 +10,10 @@ import (
 )
 
 type fakeRepository struct {
-	params CreateTicketOrderParams
-	orders []OrderView
-	detail OrderView
+	params     CreateTicketOrderParams
+	adminQuery AdminOrderQuery
+	orders     []OrderView
+	detail     OrderView
 }
 
 func (r *fakeRepository) Create(ctx context.Context, params CreateTicketOrderParams) (model.TicketOrder, error) {
@@ -38,6 +39,7 @@ func (r *fakeRepository) FindByIDAndUser(ctx context.Context, orderID string, us
 }
 
 func (r *fakeRepository) AdminList(ctx context.Context, query AdminOrderQuery) ([]OrderView, error) {
+	r.adminQuery = query
 	return r.orders, nil
 }
 
@@ -145,6 +147,19 @@ func TestAdminDetailRejectsInvalidRequest(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).AdminDetail(context.Background(), "")
 	if !errors.Is(err, ErrInvalidTicketOrder) {
 		t.Fatalf("expected invalid ticket order error, got %v", err)
+	}
+}
+
+func TestAdminListKeepsPhoneFilter(t *testing.T) {
+	repository := &fakeRepository{}
+	_, err := NewService(repository).AdminList(context.Background(), AdminOrderQuery{
+		Phone: "13800138000",
+	})
+	if err != nil {
+		t.Fatalf("admin list orders failed: %v", err)
+	}
+	if repository.adminQuery.Phone != "13800138000" {
+		t.Fatalf("unexpected phone filter: %s", repository.adminQuery.Phone)
 	}
 }
 

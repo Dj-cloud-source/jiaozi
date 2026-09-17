@@ -49,7 +49,9 @@ func main() {
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
-	userHandler := user.NewHandler(userService)
+	orderRepository := order.NewRepository(db)
+	orderService := order.NewService(orderRepository)
+	userHandler := user.NewHandler(userService, orderService)
 
 	stationRepository := station.NewRepository(db)
 	stationService := station.NewService(stationRepository)
@@ -61,7 +63,6 @@ func main() {
 
 	passengerRepository := passenger.NewRepository(db)
 	seatRepository := seat.NewRepository(db)
-	orderRepository := order.NewRepository(db)
 	paymentRepository := payment.NewRepository(db)
 	orderAppService := orderapp.NewService(
 		db,
@@ -81,7 +82,7 @@ func main() {
 	)
 	paymentAppHandler := paymentapp.NewHandler(paymentAppService)
 
-	ticketService := ticket.NewService(order.NewService(orderRepository))
+	ticketService := ticket.NewService(orderService)
 	ticketHandler := ticket.NewHandler(ticketService)
 
 	trainStatusScheduler := scheduler.NewTrainStatusScheduler(

@@ -21,6 +21,8 @@ type AdminAuditHandler interface {
 
 type UserHandler interface {
 	Me(*gin.Context)
+	AdminList(*gin.Context)
+	AdminDetail(*gin.Context)
 }
 
 type StationHandler interface {
@@ -100,6 +102,8 @@ func NewRouter(
 	admin.PATCH("/trains/:train_id", trainHandler.Update)
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)
 	admin.POST("/trains/:train_id/archive", trainHandler.Archive)
+	admin.GET("/users", userHandler.AdminList)
+	admin.GET("/users/:user_id", userHandler.AdminDetail)
 	admin.GET("/orders", orderHandler.AdminList)
 	admin.GET("/orders/:order_id", orderHandler.AdminDetail)
 	admin.GET("/audit-logs", adminAuditHandler.List)

@@ -167,6 +167,7 @@ func (h *Handler) Return(c *gin.Context) {
 func (h *Handler) AdminList(c *gin.Context) {
 	orders, err := h.service.AdminListOrders(c.Request.Context(), order.AdminOrderQuery{
 		Status:   c.Query("status"),
+		Phone:    c.Query("phone"),
 		TrainNo:  c.Query("train_no"),
 		Page:     parseIntQuery(c.Query("page")),
 		PageSize: parseIntQuery(c.Query("page_size")),
