@@ -201,6 +201,40 @@ func (r *Repository) Publish(ctx context.Context, trainID uint64) (model.Train, 
 	return train, nil
 }
 
+func (r *Repository) Archive(ctx context.Context, trainID uint64) (model.Train, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return model.Train{}, err
+	}
+	defer tx.Rollback()
+
+	train, err := findTrainForUpdate(ctx, tx, trainID)
+	if err != nil {
+		return model.Train{}, err
+	}
+	if train.Status != "DEPARTED" {
+		return model.Train{}, ErrTrainStatusInvalid
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE trains SET status = ? WHERE id = ? AND status = ?`,
+		"ARCHIVED",
+		train.ID,
+		"DEPARTED",
+	)
+	if err != nil {
+		return model.Train{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return model.Train{}, err
+	}
+
+	train.Status = "ARCHIVED"
+	return train, nil
+}
+
 type trainRow struct {
 	ID                   uint64         `db:"id"`
 	TrainNo              string         `db:"train_no"`

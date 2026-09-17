@@ -16,6 +16,7 @@ type repository interface {
 	Create(ctx context.Context, params CreateTrainParams) (model.Train, error)
 	Update(ctx context.Context, trainID uint64, params CreateTrainParams) (model.Train, error)
 	Publish(ctx context.Context, trainID uint64) (model.Train, error)
+	Archive(ctx context.Context, trainID uint64) (model.Train, error)
 	List(ctx context.Context, query ListTrainQuery) ([]TrainView, error)
 	AdminList(ctx context.Context, query AdminListTrainQuery) ([]TrainView, error)
 	FindByID(ctx context.Context, trainID uint64) (model.Train, error)
@@ -76,6 +77,14 @@ func (s *Service) Publish(ctx context.Context, trainID uint64) (model.Train, err
 	}
 
 	return s.repository.Publish(ctx, trainID)
+}
+
+func (s *Service) Archive(ctx context.Context, trainID uint64) (model.Train, error) {
+	if trainID == 0 {
+		return model.Train{}, ErrTrainNotFound
+	}
+
+	return s.repository.Archive(ctx, trainID)
 }
 
 func (s *Service) List(ctx context.Context, req ListTrainsRequest) ([]TrainView, error) {

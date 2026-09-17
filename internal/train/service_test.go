@@ -74,6 +74,15 @@ func (r *fakeRepository) Publish(ctx context.Context, trainID uint64) (model.Tra
 	return r.train, nil
 }
 
+func (r *fakeRepository) Archive(ctx context.Context, trainID uint64) (model.Train, error) {
+	if r.err != nil {
+		return model.Train{}, r.err
+	}
+	r.train.ID = trainID
+	r.train.Status = "ARCHIVED"
+	return r.train, nil
+}
+
 func (r *fakeRepository) List(ctx context.Context, query ListTrainQuery) ([]TrainView, error) {
 	if r.err != nil {
 		return nil, r.err
@@ -266,6 +275,34 @@ func TestUpdateTrainRejectsZeroID(t *testing.T) {
 
 func TestPublishTrainRejectsZeroID(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).Publish(context.Background(), 0)
+	if !errors.Is(err, ErrTrainNotFound) {
+		t.Fatalf("expected train not found error, got %v", err)
+	}
+}
+
+func TestArchiveTrainReturnsArchived(t *testing.T) {
+	service := NewService(&fakeRepository{
+		train: model.Train{
+			TrainNo: "G101",
+			Status:  "DEPARTED",
+		},
+	})
+
+	train, err := service.Archive(context.Background(), 10001)
+	if err != nil {
+		t.Fatalf("archive train failed: %v", err)
+	}
+
+	if train.ID != 10001 {
+		t.Fatalf("unexpected train id: %d", train.ID)
+	}
+	if train.Status != "ARCHIVED" {
+		t.Fatalf("unexpected train status: %s", train.Status)
+	}
+}
+
+func TestArchiveTrainRejectsZeroID(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).Archive(context.Background(), 0)
 	if !errors.Is(err, ErrTrainNotFound) {
 		t.Fatalf("expected train not found error, got %v", err)
 	}
