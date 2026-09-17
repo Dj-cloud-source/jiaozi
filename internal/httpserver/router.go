@@ -11,6 +11,10 @@ type AuthHandler interface {
 	Login(*gin.Context)
 }
 
+type AdminAuthHandler interface {
+	Login(*gin.Context)
+}
+
 type UserHandler interface {
 	Me(*gin.Context)
 }
@@ -51,6 +55,8 @@ type TicketHandler interface {
 func NewRouter(
 	authHandler AuthHandler,
 	authMiddleware gin.HandlerFunc,
+	adminAuthHandler AdminAuthHandler,
+	adminMiddleware gin.HandlerFunc,
 	userHandler UserHandler,
 	stationHandler StationHandler,
 	trainHandler TrainHandler,
@@ -72,6 +78,8 @@ func NewRouter(
 	api.GET("/trains/:train_id", trainHandler.Detail)
 
 	admin := api.Group("/admin")
+	admin.POST("/auth/login", adminAuthHandler.Login)
+	admin.Use(adminMiddleware)
 	admin.POST("/stations", stationHandler.Create)
 	admin.POST("/trains", trainHandler.Create)
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)

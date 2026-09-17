@@ -14,6 +14,11 @@ type TokenManager struct {
 	tokenExpireSeconds int64
 }
 
+const (
+	TokenSubjectUser  = "user"
+	TokenSubjectAdmin = "admin"
+)
+
 func NewTokenManager(secret string, tokenExpireSeconds int64) *TokenManager {
 	return &TokenManager{
 		secret:             []byte(secret),
@@ -22,14 +27,38 @@ func NewTokenManager(secret string, tokenExpireSeconds int64) *TokenManager {
 }
 
 func (m *TokenManager) Issue(userID uint64) (string, error) {
+	return m.IssueUser(userID)
+}
+
+func (m *TokenManager) IssueUser(userID uint64) (string, error) {
+	return m.issue(TokenSubjectUser, userID)
+}
+
+func (m *TokenManager) IssueAdmin(adminID uint64) (string, error) {
+	return m.issue(TokenSubjectAdmin, adminID)
+}
+
+func (m *TokenManager) issue(subject string, id uint64) (string, error) {
 	expiresAt := time.Now().Add(time.Duration(m.tokenExpireSeconds) * time.Second).Unix()
-	payload := strconv.FormatUint(userID, 10) + ":" + strconv.FormatInt(expiresAt, 10)
+	payload := subject + ":" + strconv.FormatUint(id, 10) + ":" + strconv.FormatInt(expiresAt, 10)
 	signature := m.sign(payload)
 
 	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + signature, nil
 }
 
 func (m *TokenManager) Parse(token string) (uint64, error) {
+	return m.ParseUser(token)
+}
+
+func (m *TokenManager) ParseUser(token string) (uint64, error) {
+	return m.parse(token, TokenSubjectUser)
+}
+
+func (m *TokenManager) ParseAdmin(token string) (uint64, error) {
+	return m.parse(token, TokenSubjectAdmin)
+}
+
+func (m *TokenManager) parse(token string, expectedSubject string) (uint64, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 2 {
 		return 0, ErrUnauthorized
@@ -46,16 +75,19 @@ func (m *TokenManager) Parse(token string) (uint64, error) {
 	}
 
 	fields := strings.Split(payload, ":")
-	if len(fields) != 2 {
+	if len(fields) != 3 {
+		return 0, ErrUnauthorized
+	}
+	if fields[0] != expectedSubject {
 		return 0, ErrUnauthorized
 	}
 
-	userID, err := strconv.ParseUint(fields[0], 10, 64)
+	id, err := strconv.ParseUint(fields[1], 10, 64)
 	if err != nil {
 		return 0, ErrUnauthorized
 	}
 
-	expiresAt, err := strconv.ParseInt(fields[1], 10, 64)
+	expiresAt, err := strconv.ParseInt(fields[2], 10, 64)
 	if err != nil {
 		return 0, ErrUnauthorized
 	}
@@ -63,7 +95,7 @@ func (m *TokenManager) Parse(token string) (uint64, error) {
 		return 0, ErrUnauthorized
 	}
 
-	return userID, nil
+	return id, nil
 }
 
 func (m *TokenManager) ExpiresIn() int64 {

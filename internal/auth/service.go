@@ -60,7 +60,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, e
 		return LoginResponse{}, ErrInvalidPhoneOrPassword
 	}
 
-	token, err := s.tokens.Issue(user.ID)
+	token, err := s.tokens.IssueUser(user.ID)
 	if err != nil {
 		return LoginResponse{}, err
 	}
