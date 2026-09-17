@@ -51,6 +51,20 @@ func (r *fakeRepository) UpdateName(ctx context.Context, stationID uint64, name 
 	return model.Station{}, ErrStationNotFound
 }
 
+func (r *fakeRepository) Disable(ctx context.Context, stationID uint64) (model.Station, error) {
+	for _, station := range r.stations {
+		if station.ID == stationID {
+			if station.Status != "ACTIVE" {
+				return model.Station{}, ErrStationStatusInvalid
+			}
+			station.Status = "DISABLED"
+			return station, nil
+		}
+	}
+
+	return model.Station{}, ErrStationNotFound
+}
+
 func TestListActiveReturnsStations(t *testing.T) {
 	service := NewService(&fakeRepository{
 		stations: []model.Station{
@@ -148,5 +162,35 @@ func TestUpdateStationNameRejectsEmptyName(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidStationName) {
 		t.Fatalf("expected invalid station name error, got %v", err)
+	}
+}
+
+func TestDisableStationDisablesActiveStation(t *testing.T) {
+	service := NewService(&fakeRepository{
+		stations: []model.Station{
+			{ID: 1, Name: "南京南", Status: "ACTIVE"},
+		},
+	})
+
+	station, err := service.Disable(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("disable station failed: %v", err)
+	}
+
+	if station.Status != "DISABLED" {
+		t.Fatalf("unexpected station status: %s", station.Status)
+	}
+}
+
+func TestDisableStationRejectsDisabledStation(t *testing.T) {
+	service := NewService(&fakeRepository{
+		stations: []model.Station{
+			{ID: 1, Name: "旧站", Status: "DISABLED"},
+		},
+	})
+
+	_, err := service.Disable(context.Background(), 1)
+	if !errors.Is(err, ErrStationStatusInvalid) {
+		t.Fatalf("expected station status invalid error, got %v", err)
 	}
 }

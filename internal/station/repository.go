@@ -119,3 +119,32 @@ func (r *Repository) UpdateName(ctx context.Context, stationID uint64, name stri
 
 	return r.FindByID(ctx, stationID)
 }
+
+func (r *Repository) Disable(ctx context.Context, stationID uint64) (model.Station, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE stations
+		 SET status = ?
+		 WHERE id = ?
+		   AND status = ?`,
+		"DISABLED",
+		stationID,
+		"ACTIVE",
+	)
+	if err != nil {
+		return model.Station{}, err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return model.Station{}, err
+	}
+	if affected != 1 {
+		if _, err := r.FindByID(ctx, stationID); err != nil {
+			return model.Station{}, err
+		}
+		return model.Station{}, ErrStationStatusInvalid
+	}
+
+	return r.FindByID(ctx, stationID)
+}
