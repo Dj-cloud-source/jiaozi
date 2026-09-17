@@ -11,6 +11,7 @@ import (
 )
 
 type repository interface {
+	Create(ctx context.Context, params CreateAdminParams) (model.Admin, error)
 	FindByUsername(ctx context.Context, username string) (model.Admin, error)
 }
 
@@ -21,6 +22,29 @@ type Service struct {
 
 func NewService(repository repository, tokens *auth.TokenManager) *Service {
 	return &Service{repository: repository, tokens: tokens}
+}
+
+type CreateAdminRequest struct {
+	Username string
+	Password string
+}
+
+func (s *Service) Create(ctx context.Context, req CreateAdminRequest) (model.Admin, error) {
+	username := strings.TrimSpace(req.Username)
+	password := strings.TrimSpace(req.Password)
+	if username == "" || len(password) < 6 {
+		return model.Admin{}, ErrInvalidCreateAdminRequest
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return model.Admin{}, err
+	}
+
+	return s.repository.Create(ctx, CreateAdminParams{
+		Username:     username,
+		PasswordHash: string(passwordHash),
+	})
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (LoginResponse, error) {

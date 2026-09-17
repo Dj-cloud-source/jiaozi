@@ -12,8 +12,22 @@ import (
 )
 
 type fakeRepository struct {
+	createParams CreateAdminParams
 	admin model.Admin
 	err   error
+}
+
+func (r *fakeRepository) Create(ctx context.Context, params CreateAdminParams) (model.Admin, error) {
+	r.createParams = params
+	if r.err != nil {
+		return model.Admin{}, r.err
+	}
+
+	return model.Admin{
+		ID:           1,
+		Username:     params.Username,
+		PasswordHash: params.PasswordHash,
+	}, nil
 }
 
 func (r *fakeRepository) FindByUsername(ctx context.Context, username string) (model.Admin, error) {
@@ -22,6 +36,39 @@ func (r *fakeRepository) FindByUsername(ctx context.Context, username string) (m
 	}
 
 	return r.admin, nil
+}
+
+func TestCreateCreatesAdminWithPasswordHash(t *testing.T) {
+	repository := &fakeRepository{}
+	service := NewService(repository, auth.NewTokenManager("test-secret", 604800))
+
+	admin, err := service.Create(context.Background(), CreateAdminRequest{
+		Username: " admin ",
+		Password: "123456",
+	})
+	if err != nil {
+		t.Fatalf("create admin failed: %v", err)
+	}
+
+	if admin.Username != "admin" {
+		t.Fatalf("unexpected username: %s", admin.Username)
+	}
+	if repository.createParams.PasswordHash == "123456" {
+		t.Fatal("password was not hashed")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(repository.createParams.PasswordHash), []byte("123456")); err != nil {
+		t.Fatalf("password hash does not match password: %v", err)
+	}
+}
+
+func TestCreateRejectsInvalidRequest(t *testing.T) {
+	_, err := NewService(&fakeRepository{}, auth.NewTokenManager("test-secret", 604800)).Create(context.Background(), CreateAdminRequest{
+		Username: "admin",
+		Password: "12345",
+	})
+	if !errors.Is(err, ErrInvalidCreateAdminRequest) {
+		t.Fatalf("expected invalid create admin request error, got %v", err)
+	}
 }
 
 func TestLoginReturnsAdminToken(t *testing.T) {
