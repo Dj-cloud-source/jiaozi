@@ -36,6 +36,22 @@ func (r *Repository) ListActive(ctx context.Context) ([]model.Station, error) {
 	return stations, nil
 }
 
+func (r *Repository) ListAll(ctx context.Context) ([]model.Station, error) {
+	var stations []model.Station
+	err := r.db.SelectContext(
+		ctx,
+		&stations,
+		`SELECT id, name, status, created_at, updated_at
+		 FROM stations
+		 ORDER BY id ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return stations, nil
+}
+
 func (r *Repository) Create(ctx context.Context, name string) (model.Station, error) {
 	result, err := r.db.ExecContext(
 		ctx,

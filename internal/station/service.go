@@ -9,6 +9,7 @@ import (
 
 type repository interface {
 	ListActive(ctx context.Context) ([]model.Station, error)
+	ListAll(ctx context.Context) ([]model.Station, error)
 	Create(ctx context.Context, name string) (model.Station, error)
 }
 
@@ -22,6 +23,10 @@ func NewService(repository repository) *Service {
 
 func (s *Service) ListActive(ctx context.Context) ([]model.Station, error) {
 	return s.repository.ListActive(ctx)
+}
+
+func (s *Service) ListAll(ctx context.Context) ([]model.Station, error) {
+	return s.repository.ListAll(ctx)
 }
 
 func (s *Service) Create(ctx context.Context, req CreateStationRequest) (model.Station, error) {

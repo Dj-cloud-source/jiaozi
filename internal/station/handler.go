@@ -40,6 +40,25 @@ func (h *Handler) ListActive(c *gin.Context) {
 	c.JSON(http.StatusOK, httpserver.Success(response))
 }
 
+func (h *Handler) AdminList(c *gin.Context) {
+	stations, err := h.service.ListAll(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		return
+	}
+
+	response := make([]AdminStationResponse, 0, len(stations))
+	for _, station := range stations {
+		response = append(response, AdminStationResponse{
+			ID:     station.ID,
+			Name:   station.Name,
+			Status: station.Status,
+		})
+	}
+
+	c.JSON(http.StatusOK, httpserver.Success(response))
+}
+
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateStationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
