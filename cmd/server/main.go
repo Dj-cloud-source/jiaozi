@@ -53,7 +53,7 @@ func main() {
 
 	stationRepository := station.NewRepository(db)
 	stationService := station.NewService(stationRepository)
-	stationHandler := station.NewHandler(stationService)
+	stationHandler := station.NewHandler(stationService, adminAuditService)
 
 	trainRepository := train.NewRepository(db)
 	trainService := train.NewService(trainRepository)
