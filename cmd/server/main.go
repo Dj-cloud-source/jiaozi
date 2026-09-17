@@ -51,7 +51,7 @@ func main() {
 	userService := user.NewService(userRepository)
 	orderRepository := order.NewRepository(db)
 	orderService := order.NewService(orderRepository)
-	userHandler := user.NewHandler(userService, orderService)
+	userHandler := user.NewHandler(userService, orderService, adminAuditService)
 
 	stationRepository := station.NewRepository(db)
 	stationService := station.NewService(stationRepository)

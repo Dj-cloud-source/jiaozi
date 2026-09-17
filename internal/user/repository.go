@@ -63,3 +63,19 @@ func (r *Repository) AdminFindByID(ctx context.Context, id uint64) (model.User, 
 
 	return user, nil
 }
+
+func (r *Repository) UpdatePasswordHash(ctx context.Context, userID uint64, passwordHash string) (int64, error) {
+	result, err := r.db.ExecContext(
+		ctx,
+		`UPDATE users
+		 SET password_hash = ?
+		 WHERE id = ?`,
+		passwordHash,
+		userID,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}

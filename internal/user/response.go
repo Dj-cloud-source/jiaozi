@@ -43,6 +43,11 @@ type AdminUserOrderResponse struct {
 	CreatedAt        string `json:"created_at"`
 }
 
+type ResetPasswordResponse struct {
+	UserID uint64 `json:"user_id"`
+	Status string `json:"status"`
+}
+
 func NewAdminUserResponse(user model.User) AdminUserResponse {
 	return AdminUserResponse{
 		ID:        user.ID,
