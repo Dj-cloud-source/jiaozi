@@ -2,6 +2,7 @@ package station
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/go-sql-driver/mysql"
@@ -52,6 +53,26 @@ func (r *Repository) ListAll(ctx context.Context) ([]model.Station, error) {
 	return stations, nil
 }
 
+func (r *Repository) FindByID(ctx context.Context, stationID uint64) (model.Station, error) {
+	var station model.Station
+	err := r.db.GetContext(
+		ctx,
+		&station,
+		`SELECT id, name, status, created_at, updated_at
+		 FROM stations
+		 WHERE id = ?`,
+		stationID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Station{}, ErrStationNotFound
+		}
+		return model.Station{}, err
+	}
+
+	return station, nil
+}
+
 func (r *Repository) Create(ctx context.Context, name string) (model.Station, error) {
 	result, err := r.db.ExecContext(
 		ctx,
@@ -77,4 +98,24 @@ func (r *Repository) Create(ctx context.Context, name string) (model.Station, er
 		Name:   name,
 		Status: "ACTIVE",
 	}, nil
+}
+
+func (r *Repository) UpdateName(ctx context.Context, stationID uint64, name string) (model.Station, error) {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE stations
+		 SET name = ?
+		 WHERE id = ?`,
+		name,
+		stationID,
+	)
+	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return model.Station{}, ErrStationExists
+		}
+		return model.Station{}, err
+	}
+
+	return r.FindByID(ctx, stationID)
 }

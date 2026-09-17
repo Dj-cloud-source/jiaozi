@@ -22,12 +22,33 @@ func (r *fakeRepository) ListAll(ctx context.Context) ([]model.Station, error) {
 	return r.stations, nil
 }
 
+func (r *fakeRepository) FindByID(ctx context.Context, stationID uint64) (model.Station, error) {
+	for _, station := range r.stations {
+		if station.ID == stationID {
+			return station, nil
+		}
+	}
+
+	return model.Station{}, ErrStationNotFound
+}
+
 func (r *fakeRepository) Create(ctx context.Context, name string) (model.Station, error) {
 	if r.createErr != nil {
 		return model.Station{}, r.createErr
 	}
 	r.created = model.Station{ID: 10001, Name: name, Status: "ACTIVE"}
 	return r.created, nil
+}
+
+func (r *fakeRepository) UpdateName(ctx context.Context, stationID uint64, name string) (model.Station, error) {
+	for _, station := range r.stations {
+		if station.ID == stationID {
+			station.Name = name
+			return station, nil
+		}
+	}
+
+	return model.Station{}, ErrStationNotFound
 }
 
 func TestListActiveReturnsStations(t *testing.T) {
@@ -95,6 +116,34 @@ func TestCreateStationRejectsEmptyName(t *testing.T) {
 	service := NewService(&fakeRepository{})
 
 	_, err := service.Create(context.Background(), CreateStationRequest{
+		Name: " ",
+	})
+	if !errors.Is(err, ErrInvalidStationName) {
+		t.Fatalf("expected invalid station name error, got %v", err)
+	}
+}
+
+func TestUpdateStationNameTrimsName(t *testing.T) {
+	service := NewService(&fakeRepository{
+		stations: []model.Station{
+			{ID: 1, Name: "南京南", Status: "ACTIVE"},
+		},
+	})
+
+	station, err := service.UpdateName(context.Background(), 1, UpdateStationRequest{
+		Name: " 南京南站 ",
+	})
+	if err != nil {
+		t.Fatalf("update station failed: %v", err)
+	}
+
+	if station.Name != "南京南站" {
+		t.Fatalf("unexpected station name: %s", station.Name)
+	}
+}
+
+func TestUpdateStationNameRejectsEmptyName(t *testing.T) {
+	_, err := NewService(&fakeRepository{}).UpdateName(context.Background(), 1, UpdateStationRequest{
 		Name: " ",
 	})
 	if !errors.Is(err, ErrInvalidStationName) {

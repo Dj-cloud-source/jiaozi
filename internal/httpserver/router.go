@@ -27,6 +27,7 @@ type StationHandler interface {
 	ListActive(*gin.Context)
 	AdminList(*gin.Context)
 	Create(*gin.Context)
+	Update(*gin.Context)
 }
 
 type TrainHandler interface {
@@ -88,6 +89,7 @@ func NewRouter(
 	admin.Use(adminMiddleware)
 	admin.GET("/stations", stationHandler.AdminList)
 	admin.POST("/stations", stationHandler.Create)
+	admin.PATCH("/stations/:station_id", stationHandler.Update)
 	admin.POST("/trains", trainHandler.Create)
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)
 	admin.GET("/orders", orderHandler.AdminList)
