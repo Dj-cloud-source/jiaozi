@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"jiaozi/internal/admin"
+	"jiaozi/internal/adminaudit"
 	"jiaozi/internal/auth"
 	"jiaozi/internal/config"
 	"jiaozi/internal/httpserver"
@@ -42,6 +43,9 @@ func main() {
 	adminRepository := admin.NewRepository(db)
 	adminService := admin.NewService(adminRepository, tokenManager)
 	adminHandler := admin.NewHandler(adminService)
+	adminAuditRepository := adminaudit.NewRepository(db)
+	adminAuditService := adminaudit.NewService(adminAuditRepository)
+	adminAuditHandler := adminaudit.NewHandler(adminAuditService)
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
@@ -98,7 +102,7 @@ func main() {
 	)
 	orderCompleteScheduler.Start(context.Background())
 
-	router := httpserver.NewRouter(authHandler, authMiddleware, adminHandler, adminMiddleware, userHandler, stationHandler, trainHandler, orderAppHandler, paymentAppHandler, ticketHandler)
+	router := httpserver.NewRouter(authHandler, authMiddleware, adminHandler, adminMiddleware, adminAuditHandler, userHandler, stationHandler, trainHandler, orderAppHandler, paymentAppHandler, ticketHandler)
 
 	log.Printf("jiaozi server listening on %s", cfg.ServerAddress())
 	if err := router.Run(cfg.ServerAddress()); err != nil {

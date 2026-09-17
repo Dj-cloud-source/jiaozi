@@ -15,6 +15,10 @@ type AdminAuthHandler interface {
 	Login(*gin.Context)
 }
 
+type AdminAuditHandler interface {
+	List(*gin.Context)
+}
+
 type UserHandler interface {
 	Me(*gin.Context)
 }
@@ -57,6 +61,7 @@ func NewRouter(
 	authMiddleware gin.HandlerFunc,
 	adminAuthHandler AdminAuthHandler,
 	adminMiddleware gin.HandlerFunc,
+	adminAuditHandler AdminAuditHandler,
 	userHandler UserHandler,
 	stationHandler StationHandler,
 	trainHandler TrainHandler,
@@ -85,6 +90,7 @@ func NewRouter(
 	admin.POST("/trains/:train_id/publish", trainHandler.Publish)
 	admin.GET("/orders", orderHandler.AdminList)
 	admin.GET("/orders/:order_id", orderHandler.AdminDetail)
+	admin.GET("/audit-logs", adminAuditHandler.List)
 
 	users := api.Group("/users")
 	users.Use(authMiddleware)
