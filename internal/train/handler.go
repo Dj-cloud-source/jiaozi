@@ -58,6 +58,17 @@ func (h *Handler) Publish(c *gin.Context) {
 		return
 	}
 
+	beforeTrain, err := h.service.Detail(c.Request.Context(), trainID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrTrainNotFound):
+			c.JSON(http.StatusNotFound, httpserver.Error(42001, "train not found"))
+		default:
+			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
+		}
+		return
+	}
+
 	train, err := h.service.Publish(c.Request.Context(), trainID)
 	if err != nil {
 		switch {
@@ -68,6 +79,11 @@ func (h *Handler) Publish(c *gin.Context) {
 		default:
 			c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
 		}
+		return
+	}
+
+	if err := h.writePublishTrainAudit(c, beforeTrain, train); err != nil {
+		c.JSON(http.StatusInternalServerError, httpserver.Error(50000, "internal server error"))
 		return
 	}
 
@@ -166,6 +182,44 @@ func (h *Handler) writeCreateTrainAudit(c *gin.Context, train model.Train) error
 		Action:       "CREATE_TRAIN",
 		ResourceType: "TRAIN",
 		ResourceID:   &resourceID,
+		AfterData:    &afterDataJSON,
+	})
+	return err
+}
+
+func (h *Handler) writePublishTrainAudit(c *gin.Context, beforeTrain TrainView, afterTrain model.Train) error {
+	adminID, ok := currentAdminID(c)
+	if !ok {
+		return auth.ErrUnauthorized
+	}
+
+	resourceID := strconv.FormatUint(afterTrain.ID, 10)
+	beforeData := map[string]interface{}{
+		"id":     beforeTrain.ID,
+		"status": beforeTrain.Status,
+	}
+	beforeDataBytes, err := json.Marshal(beforeData)
+	if err != nil {
+		return err
+	}
+	beforeDataJSON := string(beforeDataBytes)
+
+	afterData := map[string]interface{}{
+		"id":     afterTrain.ID,
+		"status": afterTrain.Status,
+	}
+	afterDataBytes, err := json.Marshal(afterData)
+	if err != nil {
+		return err
+	}
+	afterDataJSON := string(afterDataBytes)
+
+	_, err = h.audit.Create(c.Request.Context(), adminaudit.CreateRequest{
+		AdminID:      adminID,
+		Action:       "PUBLISH_TRAIN",
+		ResourceType: "TRAIN",
+		ResourceID:   &resourceID,
+		BeforeData:   &beforeDataJSON,
 		AfterData:    &afterDataJSON,
 	})
 	return err
