@@ -57,7 +57,7 @@ func main() {
 
 	trainRepository := train.NewRepository(db)
 	trainService := train.NewService(trainRepository)
-	trainHandler := train.NewHandler(trainService)
+	trainHandler := train.NewHandler(trainService, adminAuditService)
 
 	passengerRepository := passenger.NewRepository(db)
 	seatRepository := seat.NewRepository(db)
