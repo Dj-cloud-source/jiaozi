@@ -235,7 +235,9 @@ POST /api/v1/auth/login
 
 ---
 
-# 7. 退出登录
+# 7. 退出登录（后续完善）
+
+当前 v1 暂不实现此接口。
 
 ```http
 POST /api/v1/auth/logout
@@ -280,7 +282,9 @@ Response：
 
 ---
 
-# 9. 修改个人信息
+# 9. 修改个人信息（后续完善）
+
+当前 v1 暂不实现此接口。
 
 ```http
 PATCH /api/v1/users/me
@@ -302,7 +306,9 @@ Request：
 
 ---
 
-# 10. 修改密码
+# 10. 修改密码（后续完善）
+
+当前 v1 暂不实现此接口。
 
 ```http
 PUT /api/v1/users/me/password
@@ -1730,11 +1736,8 @@ COMPLETED
 ```text
 POST   /auth/register
 POST   /auth/login
-POST   /auth/logout
 
 GET    /users/me
-PATCH  /users/me
-PUT    /users/me/password
 
 GET    /stations
 
@@ -1751,6 +1754,14 @@ GET    /tickets/{order_id}
 
 GET    /payments/{id}
 POST   /payments/{id}/pay
+```
+
+后续完善：
+
+```text
+POST   /auth/logout
+PATCH  /users/me
+PUT    /users/me/password
 ```
 
 开发环境：
