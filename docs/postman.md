@@ -96,6 +96,9 @@ Postman Environment 计划包含：
 
 ```text
 base_url
+user_phone
+user_password
+user_nickname
 user_token
 admin_token
 station_id
@@ -110,6 +113,9 @@ payment_id
 
 ```text
 base_url
+user_phone
+user_password
+user_nickname
 user_token
 ```
 
@@ -117,9 +123,14 @@ user_token
 
 ```text
 base_url = http://127.0.0.1:8080
+user_phone = 13800138000
+user_password = 123456
+user_nickname = zhangsan
 ```
 
 实际地址由 Windows 到 Linux 后端的网络连接方式决定。
+
+上述用户信息仅为本地联调示例。重复执行注册请求前，需要更换 `user_phone`。
 
 密码、Token 和其他敏感值不得提交到 Git。仓库中的 Environment 文件只能保存空值或示例值。
 
