@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1",
-    "description": "第一阶段联调：健康检查、注册、登录和获取当前用户。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-2",
+    "description": "第一、二阶段联调：用户基础链路、管理员登录和站点准备。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -349,6 +349,310 @@
                   "    pm.response.to.have.status(401);",
                   "    var body = pm.response.json();",
                   "    pm.expect(body.code).to.eql(41003);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 管理员与站点",
+      "description": "执行前先在 Linux 中初始化管理员。依次执行后会保存 admin_token、departure_station_id 和 arrival_station_id。",
+      "item": [
+        {
+          "name": "01 管理员登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "管理员账号需要先通过 cmd/admin-init 在 Linux 中创建。登录成功后自动保存 admin_token。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"管理员登录成功并返回 Token\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.access_token).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.admin.username).to.eql(pm.environment.get(\"admin_username\"));",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 && body.code === 0 && body.data.access_token) {",
+                  "    pm.environment.set(\"admin_token\", body.data.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 创建出发站",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{departure_station_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations"
+              ]
+            },
+            "description": "创建下一阶段车次使用的出发站，并自动保存 departure_station_id。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"出发站创建成功\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.be.a(\"number\");",
+                  "    pm.expect(body.data.name).to.eql(pm.environment.get(\"departure_station_name\"));",
+                  "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
+                  "    pm.environment.set(\"departure_station_id\", body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 创建到达站",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{arrival_station_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations"
+              ]
+            },
+            "description": "创建下一阶段车次使用的到达站，并自动保存 arrival_station_id。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"到达站创建成功\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.be.a(\"number\");",
+                  "    pm.expect(body.data.name).to.eql(pm.environment.get(\"arrival_station_name\"));",
+                  "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
+                  "    pm.environment.set(\"arrival_station_id\", body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 查询公开站点",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stations"
+              ]
+            },
+            "description": "普通用户无需登录即可查询所有 ACTIVE 站点。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"公开列表包含新建站点\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var ids = body.data.map(function (station) { return station.id; });",
+                  "    pm.expect(ids).to.include(Number(pm.environment.get(\"departure_station_id\")));",
+                  "    pm.expect(ids).to.include(Number(pm.environment.get(\"arrival_station_id\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 管理员查询站点",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations"
+              ]
+            },
+            "description": "管理员列表包含站点状态字段。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"管理员列表包含两个 ACTIVE 站点\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var expected = [Number(pm.environment.get(\"departure_station_id\")), Number(pm.environment.get(\"arrival_station_id\"))];",
+                  "    var matched = body.data.filter(function (station) { return expected.indexOf(station.id) !== -1 && station.status === \"ACTIVE\"; });",
+                  "    pm.expect(matched.length).to.eql(2);",
                   "});"
                 ]
               }

@@ -39,9 +39,9 @@ Postman 通过 `base_url` 访问后端，不在集合中写死主机地址和端
 
 ---
 
-# 3. 当前目标
+# 3. 当前进度
 
-第一阶段先验证最小 HTTP 链路：
+第一阶段已经验证最小 HTTP 链路：
 
 ```text
 健康检查
@@ -62,11 +62,46 @@ POST /api/v1/auth/login
 GET  /api/v1/users/me
 ```
 
-第一阶段验证成功后，再逐步加入管理员、站点、车次、订单、Mock 支付和电子票接口。
+第二阶段验证管理员登录和创建车次前需要的站点数据：
+
+```text
+管理员登录
+↓
+创建出发站
+↓
+创建到达站
+↓
+查询公开站点列表
+↓
+查询管理员站点列表
+```
+
+对应接口：
+
+```text
+POST /api/v1/admin/auth/login
+POST /api/v1/admin/stations
+GET  /api/v1/stations
+GET  /api/v1/admin/stations
+```
+
+站点修改和停用暂不加入本阶段，避免影响下一阶段创建车次。
 
 ---
 
-# 4. 后续完善接口
+# 4. 第二阶段前置条件
+
+管理员不能通过 HTTP 接口注册，需要先在 VMware Linux 中初始化一次：
+
+```bash
+go run ./cmd/admin-init -username admin -password 123456
+```
+
+该命令必须使用与后端服务相同的 MySQL 环境变量。示例账号只用于本地联调；如果管理员已经存在，不要重复初始化。
+
+---
+
+# 5. 后续完善接口
 
 以下接口当前不加入 Postman 主流程：
 
@@ -90,7 +125,7 @@ POST /api/v1/payments/alipay/notify
 
 ---
 
-# 5. 环境变量
+# 6. 环境变量
 
 Postman Environment 计划包含：
 
@@ -100,7 +135,11 @@ user_phone
 user_password
 user_nickname
 user_token
+admin_username
+admin_password
 admin_token
+departure_station_name
+arrival_station_name
 station_id
 departure_station_id
 arrival_station_id
@@ -117,6 +156,13 @@ user_phone
 user_password
 user_nickname
 user_token
+admin_username
+admin_password
+admin_token
+departure_station_name
+arrival_station_name
+departure_station_id
+arrival_station_id
 ```
 
 示例：
@@ -126,17 +172,21 @@ base_url = http://127.0.0.1:8080
 user_phone = 13800138000
 user_password = 123456
 user_nickname = zhangsan
+admin_username = admin
+admin_password = 123456
+departure_station_name = 南京南
+arrival_station_name = 上海虹桥
 ```
 
 实际地址由 Windows 到 Linux 后端的网络连接方式决定。
 
-上述用户信息仅为本地联调示例。重复执行注册请求前，需要更换 `user_phone`。
+上述账号和站点信息仅为本地联调示例。重复执行注册请求前，需要更换 `user_phone`；重复创建站点前，需要更换对应站点名称。
 
 密码、Token 和其他敏感值不得提交到 Git。仓库中的 Environment 文件只能保存空值或示例值。
 
 ---
 
-# 6. 自动保存变量
+# 7. 自动保存变量
 
 登录成功后，Postman 测试脚本可以从响应中读取：
 
@@ -150,13 +200,30 @@ data.access_token
 user_token
 ```
 
+管理员登录成功后保存：
+
+```text
+data.access_token
+→ admin_token
+```
+
+创建两个站点后分别保存：
+
+```text
+data.id
+→ departure_station_id
+
+data.id
+→ arrival_station_id
+```
+
 后续创建资源时，可以按业务链路保存站点 ID、车次 ID、订单 ID 和支付单 ID。
 
 自动保存变量只是减少重复复制，不得代替用户理解请求和响应。
 
 ---
 
-# 7. 请求约定
+# 8. 请求约定
 
 JSON 请求统一使用：
 
@@ -184,7 +251,7 @@ Authorization: Bearer {{admin_token}}
 
 ---
 
-# 8. 基础验证
+# 9. 基础验证
 
 每个 Postman 请求至少检查：
 
@@ -205,15 +272,11 @@ HTTP 状态码符合预期
 
 ---
 
-# 9. 后续联调顺序
+# 10. 后续联调顺序
 
 完整业务链按照以下顺序逐步加入：
 
 ```text
-管理员登录
-↓
-创建出发站和到达站
-↓
 创建并发布车次
 ↓
 等待车次开售
@@ -235,7 +298,7 @@ HTTP 状态码符合预期
 
 ---
 
-# 10. 配置文件规则
+# 11. 配置文件规则
 
 后续计划生成：
 
