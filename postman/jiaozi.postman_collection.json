@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-2",
-    "description": "第一、二阶段联调：用户基础链路、管理员登录和站点准备。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-3",
+    "description": "第一至三阶段联调：用户基础链路、管理员登录、站点准备和车次开售。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -653,6 +653,464 @@
                   "    var expected = [Number(pm.environment.get(\"departure_station_id\")), Number(pm.environment.get(\"arrival_station_id\"))];",
                   "    var matched = body.data.filter(function (station) { return expected.indexOf(station.id) !== -1 && station.status === \"ACTIVE\"; });",
                   "    pm.expect(matched.length).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 车次创建与开售",
+      "description": "重新加载站点 ID，创建明天的车次、发布并等待定时任务开售。执行前需要完成管理员与站点阶段。",
+      "item": [
+        {
+          "name": "01 加载站点 ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stations"
+              ]
+            },
+            "description": "根据 Environment 中的两个站点名称查找并保存站点 ID，解决重新导入 Environment 后 ID 为空的问题。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "var departureName = pm.environment.get(\"departure_station_name\");",
+                  "var arrivalName = pm.environment.get(\"arrival_station_name\");",
+                  "var departure = body.data.find(function (station) { return station.name === departureName; });",
+                  "var arrival = body.data.find(function (station) { return station.name === arrivalName; });",
+                  "",
+                  "pm.test(\"按名称找到两个可用站点\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    pm.expect(departure, \"未找到出发站：\" + departureName).to.exist;",
+                  "    pm.expect(arrival, \"未找到到达站：\" + arrivalName).to.exist;",
+                  "});",
+                  "",
+                  "if (departure && arrival) {",
+                  "    pm.environment.set(\"departure_station_id\", departure.id);",
+                  "    pm.environment.set(\"arrival_station_id\", arrival.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 创建车次",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"train_no\": \"{{train_no}}\",\n  \"departure_date\": \"{{train_date}}\",\n  \"departure_station_id\": {{departure_station_id}},\n  \"arrival_station_id\": {{arrival_station_id}},\n  \"departure_time\": \"{{departure_time}}\",\n  \"arrival_time\": \"{{arrival_time}}\",\n  \"sale_start_time\": \"{{sale_start_time}}\",\n  \"first_class_price\": \"{{first_class_price}}\",\n  \"second_class_price\": \"{{second_class_price}}\",\n  \"first_class_seat_count\": {{first_class_seat_count}},\n  \"second_class_seat_count\": {{second_class_seat_count}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/trains",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "trains"
+              ]
+            },
+            "description": "脚本会生成明天的车次和当前时间前 1 分钟的开售时间。创建成功后自动保存 train_id。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function twoDigits(value) {",
+                  "    return String(value).padStart(2, \"0\");",
+                  "}",
+                  "",
+                  "function shanghaiDateTime(value) {",
+                  "    var shifted = new Date(value.getTime() + 8 * 60 * 60 * 1000);",
+                  "    return shifted.getUTCFullYear() + \"-\" +",
+                  "        twoDigits(shifted.getUTCMonth() + 1) + \"-\" +",
+                  "        twoDigits(shifted.getUTCDate()) + \"T\" +",
+                  "        twoDigits(shifted.getUTCHours()) + \":\" +",
+                  "        twoDigits(shifted.getUTCMinutes()) + \":\" +",
+                  "        twoDigits(shifted.getUTCSeconds()) + \"+08:00\";",
+                  "}",
+                  "",
+                  "var now = new Date();",
+                  "var shanghaiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);",
+                  "var tomorrow = new Date(Date.UTC(shanghaiNow.getUTCFullYear(), shanghaiNow.getUTCMonth(), shanghaiNow.getUTCDate() + 1));",
+                  "var trainDate = tomorrow.getUTCFullYear() + \"-\" + twoDigits(tomorrow.getUTCMonth() + 1) + \"-\" + twoDigits(tomorrow.getUTCDate());",
+                  "var trainNo = \"G\" + String(Math.floor(now.getTime() / 1000) % 10000).padStart(4, \"0\");",
+                  "",
+                  "pm.environment.set(\"train_no\", trainNo);",
+                  "pm.environment.set(\"train_date\", trainDate);",
+                  "pm.environment.set(\"departure_time\", trainDate + \"T08:30:00+08:00\");",
+                  "pm.environment.set(\"arrival_time\", trainDate + \"T10:10:00+08:00\");",
+                  "pm.environment.set(\"sale_start_time\", shanghaiDateTime(new Date(now.getTime() - 60 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"车次以草稿状态创建\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.be.a(\"number\");",
+                  "    pm.expect(body.data.train_no).to.eql(pm.environment.get(\"train_no\"));",
+                  "    pm.expect(body.data.status).to.eql(\"DRAFT\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
+                  "    pm.environment.set(\"train_id\", body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 管理员确认草稿",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/trains?train_no={{train_no}}&page=1&page_size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "trains"
+              ],
+              "query": [
+                {
+                  "key": "train_no",
+                  "value": "{{train_no}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "管理员列表应能查到刚创建的 DRAFT 车次。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"管理员列表包含草稿车次\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var train = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"train_id\")); });",
+                  "    pm.expect(train).to.exist;",
+                  "    pm.expect(train.status).to.eql(\"DRAFT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 发布车次",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/trains/{{train_id}}/publish",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "trains",
+                "{{train_id}}",
+                "publish"
+              ]
+            },
+            "description": "发布会创建座位，并将车次从 DRAFT 改为 WAITING_SALE。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"车次进入等待开售状态\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                  "    pm.expect(body.data.status).to.eql(\"WAITING_SALE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 确认自动开售",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/trains?train_no={{train_no}}&page=1&page_size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "trains"
+              ],
+              "query": [
+                {
+                  "key": "train_no",
+                  "value": "{{train_no}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "发布后等待 30 秒再发送。若仍为 WAITING_SALE，再等待几秒后重试。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"定时任务已将车次开售\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    var train = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"train_id\")); });",
+                  "    pm.expect(train).to.exist;",
+                  "    pm.expect(train.status).to.eql(\"ON_SALE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 用户查询车次",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains?departure_station_id={{departure_station_id}}&arrival_station_id={{arrival_station_id}}&date={{train_date}}&page=1&page_size=10&sort=time_asc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains"
+              ],
+              "query": [
+                {
+                  "key": "departure_station_id",
+                  "value": "{{departure_station_id}}"
+                },
+                {
+                  "key": "arrival_station_id",
+                  "value": "{{arrival_station_id}}"
+                },
+                {
+                  "key": "date",
+                  "value": "{{train_date}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                },
+                {
+                  "key": "sort",
+                  "value": "time_asc"
+                }
+              ]
+            },
+            "description": "普通用户按路线和日期查询已经开售的车次及实时余票。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"查询结果包含开售车次和余票\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    var train = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"train_id\")); });",
+                  "    pm.expect(train).to.exist;",
+                  "    pm.expect(train.status).to.eql(\"ON_SALE\");",
+                  "    pm.expect(train.first_class.available_count).to.eql(Number(pm.environment.get(\"first_class_seat_count\")));",
+                  "    pm.expect(train.second_class.available_count).to.eql(Number(pm.environment.get(\"second_class_seat_count\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 查询车次详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "查询刚创建车次的完整信息。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"车次详情正确\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                  "    pm.expect(body.data.train_no).to.eql(pm.environment.get(\"train_no\"));",
+                  "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
                   "});"
                 ]
               }

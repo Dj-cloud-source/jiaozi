@@ -62,7 +62,7 @@ POST /api/v1/auth/login
 GET  /api/v1/users/me
 ```
 
-第二阶段验证管理员登录和创建车次前需要的站点数据：
+第二阶段已经验证管理员登录和创建车次前需要的站点数据：
 
 ```text
 管理员登录
@@ -86,6 +86,51 @@ GET  /api/v1/admin/stations
 ```
 
 站点修改和停用暂不加入本阶段，避免影响下一阶段创建车次。
+
+第三阶段验证车次从草稿到自动开售的状态流转：
+
+```text
+按名称加载出发站和到达站 ID
+↓
+自动生成明天的车次时间
+↓
+管理员创建车次
+↓
+管理员确认草稿
+↓
+发布车次
+↓
+等待最多 30 秒自动开售
+↓
+管理员确认 ON_SALE
+↓
+普通用户查询车次和详情
+```
+
+对应接口：
+
+```text
+POST /api/v1/admin/trains
+GET  /api/v1/admin/trains
+POST /api/v1/admin/trains/{train_id}/publish
+GET  /api/v1/stations
+GET  /api/v1/trains
+GET  /api/v1/trains/{train_id}
+```
+
+创建车次请求的 Pre-request Script 自动生成：
+
+```text
+train_no
+train_date
+departure_time
+arrival_time
+sale_start_time
+```
+
+车次安排在明天，开售时间设置为当前时间前 1 分钟。发布后，后端每 30 秒运行一次的车次状态任务会将其从 `WAITING_SALE` 更新为 `ON_SALE`。
+
+重新导入 Environment 后，站点 ID 可能为空。第三阶段第一个请求会根据 `departure_station_name` 和 `arrival_station_name` 查询公开站点列表，并重新保存两个站点 ID，不需要手工复制。
 
 ---
 
@@ -144,6 +189,15 @@ station_id
 departure_station_id
 arrival_station_id
 train_id
+train_no
+train_date
+departure_time
+arrival_time
+sale_start_time
+first_class_price
+second_class_price
+first_class_seat_count
+second_class_seat_count
 order_id
 payment_id
 ```
@@ -163,6 +217,16 @@ departure_station_name
 arrival_station_name
 departure_station_id
 arrival_station_id
+train_id
+train_no
+train_date
+departure_time
+arrival_time
+sale_start_time
+first_class_price
+second_class_price
+first_class_seat_count
+second_class_seat_count
 ```
 
 示例：
@@ -176,6 +240,10 @@ admin_username = admin
 admin_password = 123456
 departure_station_name = 南京南
 arrival_station_name = 上海虹桥
+first_class_price = 199.00
+second_class_price = 99.00
+first_class_seat_count = 2
+second_class_seat_count = 5
 ```
 
 实际地址由 Windows 到 Linux 后端的网络连接方式决定。
@@ -215,6 +283,13 @@ data.id
 
 data.id
 → arrival_station_id
+```
+
+创建车次成功后保存：
+
+```text
+data.id
+→ train_id
 ```
 
 后续创建资源时，可以按业务链路保存站点 ID、车次 ID、订单 ID 和支付单 ID。
@@ -277,12 +352,6 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-创建并发布车次
-↓
-等待车次开售
-↓
-用户查询车次
-↓
 创建订单并锁座
 ↓
 发起 Mock 支付
