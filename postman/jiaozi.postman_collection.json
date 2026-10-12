@@ -61,7 +61,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"{{user_password}}\",\n  \"nickname\": \"{{user_nickname}}\"\n}",
+              "raw": "{\n  \"phone\": \"13800138000\",\n  \"password\": \"123456\",\n  \"nickname\": \"zhangsan\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -80,7 +80,7 @@
                 "register"
               ]
             },
-            "description": "首次执行前确认 user_phone 尚未注册。重复测试时请在 Environment 中更换手机号。"
+            "description": "直接在 Body 中填写注册信息。重复测试时请换一个尚未注册的手机号。"
           },
           "response": [],
           "event": [
@@ -93,12 +93,18 @@
                   "    pm.response.to.have.status(201);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.request.body.raw);",
+                  "var body = pm.response.json();",
                   "pm.test(\"注册成功并返回用户信息\", function () {",
-                  "    var body = pm.response.json();",
                   "    pm.expect(body.code).to.eql(0);",
                   "    pm.expect(body.data.user_id).to.be.a(\"number\");",
-                  "    pm.expect(body.data.phone).to.eql(pm.environment.get(\"user_phone\"));",
-                  "});"
+                  "    pm.expect(body.data.phone).to.eql(submitted.phone);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0) {",
+                  "    pm.environment.set(\"user_phone\", submitted.phone);",
+                  "    pm.environment.set(\"user_nickname\", submitted.nickname);",
+                  "}"
                 ]
               }
             }
@@ -117,7 +123,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "raw": "{\n  \"phone\": \"13800138000\",\n  \"password\": \"123456\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -149,6 +155,7 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.request.body.raw);",
                   "var body = pm.response.json();",
                   "pm.test(\"登录成功并返回 Token\", function () {",
                   "    pm.expect(body.code).to.eql(0);",
@@ -156,6 +163,7 @@
                   "});",
                   "",
                   "if (pm.response.code === 200 && body.code === 0 && body.data.access_token) {",
+                  "    pm.environment.set(\"user_phone\", submitted.phone);",
                   "    pm.environment.set(\"user_token\", body.data.access_token);",
                   "}"
                 ]
@@ -232,7 +240,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"{{user_password}}\",\n  \"nickname\": \"{{user_nickname}}\"\n}",
+              "raw": "{\n  \"phone\": \"{{user_phone}}\",\n  \"password\": \"123456\",\n  \"nickname\": \"duplicate-test\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -374,7 +382,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -407,11 +415,12 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.request.body.raw);",
                   "var body = pm.response.json();",
                   "pm.test(\"管理员登录成功并返回 Token\", function () {",
                   "    pm.expect(body.code).to.eql(0);",
                   "    pm.expect(body.data.access_token).to.be.a(\"string\").and.not.empty;",
-                  "    pm.expect(body.data.admin.username).to.eql(pm.environment.get(\"admin_username\"));",
+                  "    pm.expect(body.data.admin.username).to.eql(submitted.username);",
                   "});",
                   "",
                   "if (pm.response.code === 200 && body.code === 0 && body.data.access_token) {",
@@ -445,7 +454,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{departure_station_name}}\"\n}",
+              "raw": "{\n  \"name\": \"南京南\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -477,15 +486,17 @@
                   "    pm.response.to.have.status(201);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.request.body.raw);",
                   "var body = pm.response.json();",
                   "pm.test(\"出发站创建成功\", function () {",
                   "    pm.expect(body.code).to.eql(0);",
                   "    pm.expect(body.data.id).to.be.a(\"number\");",
-                  "    pm.expect(body.data.name).to.eql(pm.environment.get(\"departure_station_name\"));",
+                  "    pm.expect(body.data.name).to.eql(submitted.name);",
                   "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
                   "});",
                   "",
                   "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
+                  "    pm.environment.set(\"departure_station_name\", submitted.name);",
                   "    pm.environment.set(\"departure_station_id\", body.data.id);",
                   "}"
                 ]
@@ -516,7 +527,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"{{arrival_station_name}}\"\n}",
+              "raw": "{\n  \"name\": \"上海虹桥\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -548,15 +559,17 @@
                   "    pm.response.to.have.status(201);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.request.body.raw);",
                   "var body = pm.response.json();",
                   "pm.test(\"到达站创建成功\", function () {",
                   "    pm.expect(body.code).to.eql(0);",
                   "    pm.expect(body.data.id).to.be.a(\"number\");",
-                  "    pm.expect(body.data.name).to.eql(pm.environment.get(\"arrival_station_name\"));",
+                  "    pm.expect(body.data.name).to.eql(submitted.name);",
                   "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
                   "});",
                   "",
                   "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
+                  "    pm.environment.set(\"arrival_station_name\", submitted.name);",
                   "    pm.environment.set(\"arrival_station_id\", body.data.id);",
                   "}"
                 ]
@@ -739,7 +752,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"train_no\": \"{{train_no}}\",\n  \"departure_date\": \"{{train_date}}\",\n  \"departure_station_id\": {{departure_station_id}},\n  \"arrival_station_id\": {{arrival_station_id}},\n  \"departure_time\": \"{{departure_time}}\",\n  \"arrival_time\": \"{{arrival_time}}\",\n  \"sale_start_time\": \"{{sale_start_time}}\",\n  \"first_class_price\": \"{{first_class_price}}\",\n  \"second_class_price\": \"{{second_class_price}}\",\n  \"first_class_seat_count\": {{first_class_seat_count}},\n  \"second_class_seat_count\": {{second_class_seat_count}}\n}",
+              "raw": "{\n  \"train_no\": \"{{train_no}}\",\n  \"departure_date\": \"{{train_date}}\",\n  \"departure_station_id\": {{departure_station_id}},\n  \"arrival_station_id\": {{arrival_station_id}},\n  \"departure_time\": \"{{departure_time}}\",\n  \"arrival_time\": \"{{arrival_time}}\",\n  \"sale_start_time\": \"{{sale_start_time}}\",\n  \"first_class_price\": \"199.00\",\n  \"second_class_price\": \"99.00\",\n  \"first_class_seat_count\": 2,\n  \"second_class_seat_count\": 5\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -804,6 +817,7 @@
                   "    pm.response.to.have.status(201);",
                   "});",
                   "",
+                  "var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
                   "var body = pm.response.json();",
                   "pm.test(\"车次以草稿状态创建\", function () {",
                   "    pm.expect(body.code).to.eql(0);",
@@ -814,6 +828,8 @@
                   "",
                   "if (pm.response.code === 201 && body.code === 0 && body.data.id) {",
                   "    pm.environment.set(\"train_id\", body.data.id);",
+                  "    pm.environment.set(\"first_class_seat_count\", submitted.first_class_seat_count);",
+                  "    pm.environment.set(\"second_class_seat_count\", submitted.second_class_seat_count);",
                   "}"
                 ]
               }

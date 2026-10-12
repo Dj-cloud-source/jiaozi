@@ -170,87 +170,58 @@ POST /api/v1/payments/alipay/notify
 
 ---
 
-# 6. 环境变量
+# 6. 输入与环境变量
 
-Postman Environment 计划包含：
+为了让操作更直观，业务输入直接在请求的 `Body` 中修改：
 
 ```text
-base_url
-user_phone
-user_password
-user_nickname
-user_token
-admin_username
-admin_password
-admin_token
-departure_station_name
-arrival_station_name
-station_id
-departure_station_id
-arrival_station_id
-train_id
-train_no
-train_date
-departure_time
-arrival_time
-sale_start_time
-first_class_price
-second_class_price
-first_class_seat_count
-second_class_seat_count
-order_id
-payment_id
+手机号、密码、昵称
+管理员用户名、密码
+站点名称
+车次票价、座位数量
+后续的乘车人和座位类型
 ```
 
-初始阶段只需要：
+Environment 模板只预置：
 
 ```text
 base_url
-user_phone
-user_password
-user_nickname
-user_token
-admin_username
-admin_password
-admin_token
-departure_station_name
-arrival_station_name
-departure_station_id
-arrival_station_id
-train_id
-train_no
-train_date
-departure_time
-arrival_time
-sale_start_time
-first_class_price
-second_class_price
-first_class_seat_count
-second_class_seat_count
 ```
 
 示例：
 
 ```text
 base_url = http://127.0.0.1:8080
-user_phone = 13800138000
-user_password = 123456
-user_nickname = zhangsan
-admin_username = admin
-admin_password = 123456
-departure_station_name = 南京南
-arrival_station_name = 上海虹桥
-first_class_price = 199.00
-second_class_price = 99.00
-first_class_seat_count = 2
-second_class_seat_count = 5
 ```
 
 实际地址由 Windows 到 Linux 后端的网络连接方式决定。
 
-上述账号和站点信息仅为本地联调示例。重复执行注册请求前，需要更换 `user_phone`；重复创建站点前，需要更换对应站点名称。
+以下运行状态由 Postman 脚本自动写入 Environment，不要求用户手工填写：
 
-密码、Token 和其他敏感值不得提交到 Git。仓库中的 Environment 文件只能保存空值或示例值。
+```text
+user_phone
+user_nickname
+user_token
+admin_token
+departure_station_name
+arrival_station_name
+departure_station_id
+arrival_station_id
+train_id
+train_no
+train_date
+departure_time
+arrival_time
+sale_start_time
+first_class_seat_count
+second_class_seat_count
+order_id
+payment_id
+```
+
+已经导入过 Environment 的用户只替换 Collection，保留现有 Environment，不要再次导入模板。这样 `base_url`、Token 和已保存的 ID 不会丢失。
+
+密码、Token 和其他敏感值不得提交到 Git。仓库中的 Environment 模板不得保存真实凭据。
 
 ---
 
