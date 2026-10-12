@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-4",
-    "description": "第一至四阶段联调：用户基础链路、管理员登录、站点准备、车次开售和创建订单锁座。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-5",
+    "description": "第一至五阶段联调：用户基础链路、管理员登录、站点准备、车次开售、创建订单锁座和 Mock 支付出票。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1463,6 +1463,281 @@
                   "        pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")) - 1);",
                   "        pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")));",
                   "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Mock 支付与电子票",
+      "description": "依赖上一阶段自动保存的 payment_id 和 order_id，请在订单创建后的 10 分钟支付窗口内按顺序执行。",
+      "item": [
+        {
+          "name": "01 发起支付",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "pay"
+              ]
+            },
+            "description": "模拟用户正式发起付款，将支付单从 UNPAID 更新为 PAYING。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单进入支付中状态\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"PAYING\");",
+                  "    pm.expect(Number(body.data.payable_amount)).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 模拟支付成功",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/mock/success",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "mock",
+                "success"
+              ]
+            },
+            "description": "仅用于本地联调：模拟渠道返回支付成功，同时完成出票并将锁定座位改为已售。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付成功并完成订单出票\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"SUCCESS\");",
+                  "    pm.expect(body.data.order_ids).to.include(pm.environment.get(\"order_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 确认支付结果",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "重新查询支付单，确认支付单为 SUCCESS，关联订单为 TICKETED。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单和关联订单状态正确\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"SUCCESS\");",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"TICKETED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 确认订单已出票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "description": "确认订单从 WAITING_PAYMENT 更新为 TICKETED，并记录了出票时间。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"订单已出票\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"TICKETED\");",
+                  "    pm.expect(body.data.ticketed_at).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.payment.status).to.eql(\"SUCCESS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 查询电子票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tickets/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                "{{order_id}}"
+              ]
+            },
+            "description": "查询刚生成的电子票，确认乘车信息、席位和票据有效状态。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"电子票已经生成且有效\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"TICKETED\");",
+                  "    pm.expect(body.data.valid).to.eql(true);",
+                  "    pm.expect(body.data.ticketed_at).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.seat.class).to.eql(pm.environment.get(\"ordered_seat_class\"));",
+                  "    pm.expect(body.data.seat.number).to.be.a(\"number\");",
                   "});"
                 ]
               }

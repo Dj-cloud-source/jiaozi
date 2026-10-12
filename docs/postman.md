@@ -170,6 +170,34 @@ Payment = UNPAID
 
 订单的支付窗口为 10 分钟。第四阶段的 6 个请求应连续执行；超过支付截止时间后，定时任务会关闭订单并释放座位。重复练习同一趟车时，如果上一张订单仍然有效，需要在创建订单 Body 中换一个身份证号，否则后端会按“一位乘客不能重复购买同一车次”返回冲突。
 
+第五阶段验证 Mock 支付成功和电子票生成：
+
+```text
+发起支付
+UNPAID → PAYING
+↓
+模拟支付成功
+Payment: PAYING → SUCCESS
+TicketOrder: WAITING_PAYMENT → TICKETED
+Seat: LOCKED → SOLD
+↓
+查询支付单和订单详情
+↓
+查询电子票
+```
+
+对应接口：
+
+```text
+POST /api/v1/payments/{payment_id}/pay
+POST /api/v1/payments/{payment_id}/mock/success
+GET  /api/v1/payments/{payment_id}
+GET  /api/v1/orders/{order_id}
+GET  /api/v1/tickets/{order_id}
+```
+
+第五阶段依赖第四阶段刚刚创建的 `payment_id` 和 `order_id`，并且必须在 10 分钟支付截止时间内开始执行。Mock 成功接口只用于本地开发联调，不代表真实支付渠道。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -205,6 +233,8 @@ POST /api/v1/payments/alipay/notify
 ```
 
 前两个接口的异常处理规则尚未定义完整；支付宝回调属于第二阶段。
+
+`POST /api/v1/payments/{payment_id}/mock/fail` 暂不加入成功主流程，后续放入支付异常与重试场景。
 
 ---
 
@@ -374,12 +404,6 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-发起 Mock 支付
-↓
-模拟支付成功
-↓
-查询订单和电子票
-↓
 取消待支付订单 / 退票
 ```
 
