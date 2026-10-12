@@ -132,6 +132,44 @@ sale_start_time
 
 重新导入 Environment 后，站点 ID 可能为空。第三阶段第一个请求会根据 `departure_station_name` 和 `arrival_station_name` 查询公开站点列表，并重新保存两个站点 ID，不需要手工复制。
 
+第四阶段验证用户创建订单后的锁座结果：
+
+```text
+确认目标车次仍为 ON_SALE
+↓
+用户填写一位乘车人并创建订单
+↓
+自动保存订单 ID 和支付单 ID
+↓
+查询订单列表和订单详情
+↓
+查询尚未支付的支付单
+↓
+再次查询车次，确认对应席别余票减少 1
+```
+
+对应接口：
+
+```text
+GET  /api/v1/trains/{train_id}
+POST /api/v1/orders
+GET  /api/v1/orders
+GET  /api/v1/orders/{order_id}
+GET  /api/v1/payments/{payment_id}
+```
+
+当前后端创建订单只支持一位乘车人，因此 Postman 的请求 Body 只放一位乘车人。创建成功后应看到：
+
+```text
+TicketOrder = WAITING_PAYMENT
+Seat = LOCKED
+Payment = UNPAID
+```
+
+执行第四阶段前，需要先运行“01 基础链路 / 03 用户登录”刷新 `user_token`，并确保 `train_id` 对应的车次仍然是 `ON_SALE`。如果车次已经发车、停售或变量不存在，重新完整执行第三阶段，创建一趟明天开行的新车次。
+
+订单的支付窗口为 10 分钟。第四阶段的 6 个请求应连续执行；超过支付截止时间后，定时任务会关闭订单并释放座位。重复练习同一趟车时，如果上一张订单仍然有效，需要在创建订单 Body 中换一个身份证号，否则后端会按“一位乘客不能重复购买同一车次”返回冲突。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -215,6 +253,9 @@ arrival_time
 sale_start_time
 first_class_seat_count
 second_class_seat_count
+before_first_class_available
+before_second_class_available
+ordered_seat_class
 order_id
 payment_id
 ```
@@ -261,6 +302,16 @@ data.id
 ```text
 data.id
 → train_id
+```
+
+创建订单成功后保存：
+
+```text
+data.orders[0].order_id
+→ order_id
+
+data.payment_id
+→ payment_id
 ```
 
 后续创建资源时，可以按业务链路保存站点 ID、车次 ID、订单 ID 和支付单 ID。
@@ -323,8 +374,6 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-创建订单并锁座
-↓
 发起 Mock 支付
 ↓
 模拟支付成功

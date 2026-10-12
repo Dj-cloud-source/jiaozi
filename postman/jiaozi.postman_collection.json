@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-3",
-    "description": "第一至三阶段联调：用户基础链路、管理员登录、站点准备和车次开售。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-4",
+    "description": "第一至四阶段联调：用户基础链路、管理员登录、站点准备、车次开售和创建订单锁座。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1127,6 +1127,342 @@
                   "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
                   "    pm.expect(body.data.train_no).to.eql(pm.environment.get(\"train_no\"));",
                   "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 创建订单与锁座",
+      "description": "执行前先刷新用户登录，并确保 train_id 对应车次为 ON_SALE。创建订单时直接在 Body 中填写席别和一位乘车人。",
+      "item": [
+        {
+          "name": "01 确认可购车次",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "确认目标车次仍在开售，并记录下单前两种席别的余票数。若失败，请重新完整执行上一阶段创建新车次。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"车次处于开售状态\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                  "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 && body.code === 0 && body.data.status === \"ON_SALE\") {",
+                  "    pm.environment.set(\"before_first_class_available\", body.data.first_class.available_count);",
+                  "    pm.environment.set(\"before_second_class_available\", body.data.second_class.available_count);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 创建订单",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"train_id\": {{train_id}},\n  \"seat_class\": \"SECOND_CLASS\",\n  \"passengers\": [\n    {\n      \"name\": \"张三\",\n      \"id_card\": \"320101200001011234\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "直接在 Body 中填写 SECOND_CLASS 或 FIRST_CLASS，以及一位乘车人的姓名和身份证号。成功后自动保存 order_id 和 payment_id。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "var body = pm.response.json();",
+                  "pm.test(\"订单进入待支付状态\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.orders).to.have.lengthOf(1);",
+                  "    pm.expect(body.data.orders[0].order_id).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.orders[0].seat_class).to.eql(submitted.seat_class);",
+                  "    pm.expect(body.data.orders[0].status).to.eql(\"WAITING_PAYMENT\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0 && body.data.orders.length === 1) {",
+                  "    pm.environment.set(\"order_id\", body.data.orders[0].order_id);",
+                  "    pm.environment.set(\"payment_id\", body.data.payment_id);",
+                  "    pm.environment.set(\"ordered_seat_class\", submitted.seat_class);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 查询订单列表",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "查询当前用户的订单，并确认列表中包含刚创建的待支付订单。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"订单列表包含新订单\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var order = body.data.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"WAITING_PAYMENT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 查询订单详情",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "description": "确认订单详情、座位和关联支付单均已生成。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"订单详情为待支付并已分配座位\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"WAITING_PAYMENT\");",
+                  "    pm.expect(body.data.seat_no).to.be.a(\"number\");",
+                  "    pm.expect(body.data.payment.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.payment.status).to.eql(\"UNPAID\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 查询支付单",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "确认支付单尚未支付，并且关联刚创建的订单。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单为未支付状态\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"UNPAID\");",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"WAITING_PAYMENT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 确认余票已锁定",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "再次查询车次，确认所选席别的可用座位数比下单前减少 1。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"所选席别余票减少 1\", function () {",
+                  "    var body = pm.response.json();",
+                  "    var seatClass = pm.environment.get(\"ordered_seat_class\");",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                  "    if (seatClass === \"FIRST_CLASS\") {",
+                  "        pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")) - 1);",
+                  "        pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")));",
+                  "    } else {",
+                  "        pm.expect(seatClass).to.eql(\"SECOND_CLASS\");",
+                  "        pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")) - 1);",
+                  "        pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")));",
+                  "    }",
                   "});"
                 ]
               }
