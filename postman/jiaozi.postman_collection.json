@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-7",
-    "description": "第一至七阶段联调：用户基础链路、管理员登录、站点准备、车次开售、创建订单锁座、Mock 支付出票、退票和取消待支付订单。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-8",
+    "description": "第一至八阶段联调：用户基础链路、管理员登录、站点准备、车次开售、订单锁座、Mock 支付出票、退票、取消订单和支付失败重试。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -2427,6 +2427,549 @@
                   "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
                   "    pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")));",
                   "    pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 支付失败与重新支付",
+      "description": "创建一张新订单，模拟首次支付失败后重新支付成功。全部请求必须在订单原有的 10 分钟支付窗口内完成。",
+      "item": [
+        {
+          "name": "01 记录下单前余票",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "确认车次仍在开售，并记录创建重试订单前的余票数。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var body = pm.response.json();",
+                  "pm.test(\"车次处于开售状态\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                  "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200 && body.code === 0 && body.data.status === \"ON_SALE\") {",
+                  "    pm.environment.set(\"before_first_class_available\", body.data.first_class.available_count);",
+                  "    pm.environment.set(\"before_second_class_available\", body.data.second_class.available_count);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 创建支付重试订单",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"train_id\": {{train_id}},\n  \"seat_class\": \"SECOND_CLASS\",\n  \"passengers\": [\n    {\n      \"name\": \"王五\",\n      \"id_card\": \"320101200003033456\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders"
+              ]
+            },
+            "description": "直接在 Body 中填写席别和乘车人。成功后保存新的 order_id、payment_id 和席别。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "var body = pm.response.json();",
+                  "pm.test(\"新订单等待支付\", function () {",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.orders).to.have.lengthOf(1);",
+                  "    pm.expect(body.data.orders[0].status).to.eql(\"WAITING_PAYMENT\");",
+                  "    pm.expect(body.data.orders[0].seat_class).to.eql(submitted.seat_class);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201 && body.code === 0 && body.data.orders.length === 1) {",
+                  "    pm.environment.set(\"order_id\", body.data.orders[0].order_id);",
+                  "    pm.environment.set(\"payment_id\", body.data.payment_id);",
+                  "    pm.environment.set(\"ordered_seat_class\", submitted.seat_class);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 第一次发起支付",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "pay"
+              ]
+            },
+            "description": "第一次发起付款，将支付单从 UNPAID 更新为 PAYING。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单进入支付中\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"PAYING\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 模拟支付失败",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/mock/fail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "mock",
+                "fail"
+              ]
+            },
+            "description": "仅用于本地联调：把本次支付尝试从 PAYING 更新为 FAILED。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付尝试已经失败\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"FAILED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 确认失败未取消订单",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "确认 Payment 为 FAILED，但关联订单仍为 WAITING_PAYMENT，仍可继续支付。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"失败只影响支付尝试\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.status).to.eql(\"FAILED\");",
+                  "    pm.expect(Number(body.data.payable_amount)).to.be.above(0);",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"WAITING_PAYMENT\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 确认失败未释放座位",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "确认支付失败没有取消订单，所选席别的座位仍保持锁定。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"失败后余票仍比下单前少 1\", function () {",
+                  "    var body = pm.response.json();",
+                  "    var seatClass = pm.environment.get(\"ordered_seat_class\");",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    if (seatClass === \"FIRST_CLASS\") {",
+                  "        pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")) - 1);",
+                  "    } else {",
+                  "        pm.expect(seatClass).to.eql(\"SECOND_CLASS\");",
+                  "        pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")) - 1);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 重新发起支付",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "pay"
+              ]
+            },
+            "description": "在支付截止时间内重新发起付款，将 FAILED 更新为 PAYING。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单重新进入支付中\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"PAYING\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 模拟重试支付成功",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}/mock/success",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}",
+                "mock",
+                "success"
+              ]
+            },
+            "description": "第二次支付模拟成功，完成订单出票并将座位改为已售。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"重试支付成功并完成出票\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"SUCCESS\");",
+                  "    pm.expect(body.data.order_ids).to.include(pm.environment.get(\"order_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 确认最终支付结果",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "确认 Payment 最终为 SUCCESS，关联订单最终为 TICKETED。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付和订单最终状态正确\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.status).to.eql(\"SUCCESS\");",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"TICKETED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 查询重试订单电子票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tickets/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                "{{order_id}}"
+              ]
+            },
+            "description": "确认重新支付成功后已经生成有效电子票。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"重新支付订单已经出票\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"TICKETED\");",
+                  "    pm.expect(body.data.valid).to.eql(true);",
+                  "    pm.expect(body.data.seat.class).to.eql(pm.environment.get(\"ordered_seat_class\"));",
                   "});"
                 ]
               }

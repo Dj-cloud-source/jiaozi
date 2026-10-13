@@ -260,6 +260,44 @@ GET  /api/v1/payments/{payment_id}
 
 当前后端只支持一位乘车人，因此取消这张订单后 Payment 的 `payable_amount` 应为 `0.00`，状态仍为 `UNPAID`。取消接口的实际响应仅包含 `order_id` 和 `status`，没有 `api.md` 示例中的嵌套 `payment` 字段，Postman 按当前真实响应验证。
 
+第八阶段验证支付失败后重新支付：
+
+```text
+记录当前余票并创建新订单
+↓
+第一次发起支付
+Payment: UNPAID → PAYING
+↓
+模拟支付失败
+Payment: PAYING → FAILED
+TicketOrder 仍为 WAITING_PAYMENT
+Seat 仍为 LOCKED
+↓
+再次发起支付
+Payment: FAILED → PAYING
+↓
+模拟支付成功
+Payment: PAYING → SUCCESS
+TicketOrder: WAITING_PAYMENT → TICKETED
+Seat: LOCKED → SOLD
+↓
+查询支付单和电子票
+```
+
+对应接口：
+
+```text
+GET  /api/v1/trains/{train_id}
+POST /api/v1/orders
+POST /api/v1/payments/{payment_id}/pay
+POST /api/v1/payments/{payment_id}/mock/fail
+GET  /api/v1/payments/{payment_id}
+POST /api/v1/payments/{payment_id}/mock/success
+GET  /api/v1/tickets/{order_id}
+```
+
+第八阶段会再创建一张新订单，并覆盖 Environment 中当前的 `order_id` 和 `payment_id`。支付失败不会延长或重置订单原有的 10 分钟支付窗口，因此本阶段请求应连续执行。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -296,7 +334,7 @@ POST /api/v1/payments/alipay/notify
 
 前两个接口的异常处理规则尚未定义完整；支付宝回调属于第二阶段。
 
-`POST /api/v1/payments/{payment_id}/mock/fail` 暂不加入成功主流程，后续放入支付异常与重试场景。
+`POST /api/v1/payments/{payment_id}/mock/fail` 只用于本地支付失败与重试联调，不代表真实支付渠道回调。
 
 ---
 
@@ -466,7 +504,9 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-支付失败与重新支付
+管理员用户、订单和审计查询
+↓
+订单支付超时自动取消
 ```
 
 每次只扩展一个小阶段，并在 Windows VM 中实际验证后再继续。
