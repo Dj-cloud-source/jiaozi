@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-8",
-    "description": "第一至八阶段联调：用户基础链路、管理员登录、站点准备、车次开售、订单锁座、Mock 支付出票、退票、取消订单和支付失败重试。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-9",
+    "description": "第一至八阶段联调：用户基础链路、管理员登录、站点准备、车次开售、订单锁座、Mock 支付出票、退票、取消订单和支付失败重试。请按文件夹内的编号顺序执行请求。 新增管理员用户、订单与审计查询。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -2970,6 +2970,381 @@
                   "    pm.expect(body.data.status).to.eql(\"TICKETED\");",
                   "    pm.expect(body.data.valid).to.eql(true);",
                   "    pm.expect(body.data.seat.class).to.eql(pm.environment.get(\"ordered_seat_class\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 管理员用户、订单与审计查询",
+      "description": "先刷新用户和管理员登录，再按顺序执行。沿用现有订单，列表筛选在 Params 中修改。",
+      "item": [
+        {
+          "name": "01 读取当前用户 ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "使用创建订单的用户 Token 自动保存查询用的用户 ID 和手机号。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.be.a(\"number\").and.above(0);",
+                  "    pm.expect(body.data.phone).to.be.a(\"string\").and.not.empty;",
+                  "    pm.environment.set(\"admin_query_user_id\", body.data.id);",
+                  "    pm.environment.set(\"user_phone\", body.data.phone);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 管理员查询用户列表",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users?page=1&page_size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "在 Params 中修改页码和每页数量。目标用户可以不在当前页。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    body.data.forEach(function (user) {",
+                  "        pm.expect(user.id).to.be.a(\"number\").and.above(0);",
+                  "        pm.expect(user.phone).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(user.nickname).to.be.a(\"string\");",
+                  "        pm.expect(user.created_at).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(user).not.to.have.property(\"password_hash\");",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 管理员查询用户详情",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users/{{admin_query_user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{admin_query_user_id}}"
+              ]
+            },
+            "description": "查看当前用户资料和历史订单，订单不限定状态。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"admin_query_user_id\")));",
+                  "    pm.expect(body.data.phone).to.eql(pm.environment.get(\"user_phone\"));",
+                  "    pm.expect(body.data.orders).to.be.an(\"array\");",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order, \"应使用创建该订单的用户账号登录\").to.exist;",
+                  "    pm.expect(body.data).not.to.have.property(\"password_hash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 管理员筛选订单",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/orders?phone={{user_phone}}&train_no={{train_no}}&page=1&page_size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{user_phone}}"
+                },
+                {
+                  "key": "train_no",
+                  "value": "{{train_no}}"
+                },
+                {
+                  "key": "status",
+                  "value": "TICKETED",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "默认按当前用户手机号和车次号查询。在 Params 中可勾选 status 筛选；允许无匹配结果。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var filters = {};",
+                  "    pm.request.url.query.each(function (param) {",
+                  "        if (!param.disabled) { filters[param.key] = pm.variables.replaceIn(param.value); }",
+                  "    });",
+                  "    body.data.forEach(function (order) {",
+                  "        pm.expect(order.order_id).to.be.a(\"string\").and.not.empty;",
+                  "        if (filters.train_no) { pm.expect(order.train_no).to.eql(filters.train_no); }",
+                  "        if (filters.status) { pm.expect(order.status).to.eql(filters.status); }",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 管理员查询订单详情",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "description": "查看当前订单的用户、乘车人、座位和支付信息。管理员可查看完整身份证号。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.user.id).to.eql(Number(pm.environment.get(\"admin_query_user_id\")));",
+                  "    pm.expect(body.data.user.phone).to.eql(pm.environment.get(\"user_phone\"));",
+                  "    pm.expect(body.data.train_id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                  "    pm.expect(body.data.passenger.name).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.passenger.id_card).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.passenger.id_card).not.to.include(\"*\");",
+                  "    pm.expect(body.data.seat_no).to.be.a(\"number\").and.above(0);",
+                  "    pm.expect(body.data.status).to.be.oneOf([\"WAITING_PAYMENT\", \"TICKETED\", \"CANCELLED\", \"RETURNED\", \"COMPLETED\"]);",
+                  "    pm.expect(body.data.payment.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 查询管理员审计日志",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/audit-logs?page=1&page_size=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "在 Params 中翻页。空数组合法；当前接口不支持按动作或资源筛选。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"响应数据符合查询条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    body.data.forEach(function (log) {",
+                  "        pm.expect(log.id).to.be.a(\"number\").and.above(0);",
+                  "        pm.expect(log.admin_id).to.be.a(\"number\").and.above(0);",
+                  "        pm.expect(log.action).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(log.resource_type).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(log).to.have.property(\"resource_id\");",
+                  "        if (log.resource_id !== null) { pm.expect(log.resource_id).to.be.a(\"string\"); }",
+                  "        pm.expect(log.created_at).to.be.a(\"string\").and.not.empty;",
+                  "    });",
                   "});"
                 ]
               }
