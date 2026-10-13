@@ -228,6 +228,38 @@ GET  /api/v1/trains/{train_id}
 
 当前后端的 Mock 退款实现比 `api.md` 中的目标响应简单：退票接口实际返回 `data.status = RETURNED`；Payment 暂时保持 `SUCCESS`，并将票价累计到 `refunded_amount`。当前代码尚未实现 `REFUNDING → REFUNDED` 的异步资金退款状态流转，Postman 按当前真实行为验证。
 
+第七阶段验证用户主动取消待支付订单：
+
+```text
+记录当前余票
+↓
+创建一张新的待支付订单
+TicketOrder = WAITING_PAYMENT
+Seat = LOCKED
+Payment = UNPAID
+↓
+用户主动取消订单
+TicketOrder: WAITING_PAYMENT → CANCELLED
+Seat: LOCKED → AVAILABLE
+Payment: payable_amount → 0.00
+↓
+查询订单、支付单和车次余票
+```
+
+对应接口：
+
+```text
+GET  /api/v1/trains/{train_id}
+POST /api/v1/orders
+POST /api/v1/orders/{order_id}/cancel
+GET  /api/v1/orders/{order_id}
+GET  /api/v1/payments/{payment_id}
+```
+
+第七阶段会创建新订单，并覆盖 Environment 中用于后续请求的 `order_id` 和 `payment_id`；这只是更新 Postman 当前指向的资源，不会删除之前已经退票的数据库记录。乘车人信息仍由用户直接在创建订单 Body 中填写。
+
+当前后端只支持一位乘车人，因此取消这张订单后 Payment 的 `payable_amount` 应为 `0.00`，状态仍为 `UNPAID`。取消接口的实际响应仅包含 `order_id` 和 `status`，没有 `api.md` 示例中的嵌套 `payment` 字段，Postman 按当前真实响应验证。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -434,8 +466,6 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-取消待支付订单
-↓
 支付失败与重新支付
 ```
 
