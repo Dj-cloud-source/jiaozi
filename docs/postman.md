@@ -319,6 +319,20 @@ GET  /api/v1/tickets/{order_id}
 
 实际管理员订单详情包含完整身份证号，联调请继续使用虚构乘车人信息。
 
+第十阶段对应 `11 订单超时自动取消`，分成两个子文件夹，共 9 个请求：
+
+1. `A 创建并检查`：记录车次余票、创建未支付订单、确认锁座、确认支付单 UNPAID。
+2. 人工等待创建响应中的 `payment_deadline` 到达，再等待约 30 秒，让后台任务执行。
+3. `B 到期后验证`：确认订单 CANCELLED、支付金额归零、余票恢复、发起支付被拒绝、没有电子票。
+
+执行前刷新创建订单用户的登录，确保 `train_id` 对应车次 ON_SALE、有所选席别余票，且测试结束前不会停售，可以使用第 04 组创建的明日车次。本组仅测试从未发起支付的 UNPAID 订单，不调用主动取消接口；PAYING 超时留待后续场景。
+
+先只执行 A，再等待，最后执行 B。不要一次运行整个文件夹或整个 Collection：脚本不自动等待 10 分钟。Go 服务和 MySQL 在等待期间保持运行。后端当前默认每 30 秒检查超时订单；若已过截止时间但仍 WAITING_PAYMENT，稍等后重发 B 的第一个请求，持续不变化时检查 Linux 后端日志中的 `cancel expired orders failed`。
+
+本组自动保存 `timeout_order_id`、`timeout_payment_id`、`timeout_train_id`、`timeout_payment_deadline`、`timeout_ordered_seat_class` 和两种席别的 `timeout_before_*_available`，不覆盖原来的订单变量。截止时间以创建响应为准，不修改服务器时间或数据库。等待期间不要切换用户账号，也不要对同车次做其他购票、取消或退票，否则余票对比会受到影响。
+
+预期结果：订单 CANCELLED 且有 cancelled_at；支付单仍 UNPAID，payable_amount 为 0；余票恢复到 A 下单前；发起支付返回 HTTP 409 / code 44002；查询电子票返回 HTTP 409 / code 45001。这两个预期失败请求的 Tests 应显示绿色。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -410,6 +424,13 @@ before_second_class_available
 ordered_seat_class
 order_id
 payment_id
+timeout_order_id
+timeout_payment_id
+timeout_train_id
+timeout_payment_deadline
+timeout_ordered_seat_class
+timeout_before_first_class_available
+timeout_before_second_class_available
 ```
 
 已经导入过 Environment 的用户只替换 Collection，保留现有 Environment，不要再次导入模板。这样 `base_url`、Token 和已保存的 ID 不会丢失。
@@ -526,7 +547,7 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-订单支付超时自动取消
+管理员站点与车次维护
 ```
 
 每次只扩展一个小阶段，并在 Windows VM 中实际验证后再继续。

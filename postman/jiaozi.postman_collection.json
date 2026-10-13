@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-9",
+    "name": "Jiaozi API - Phase 1-10",
     "description": "第一至八阶段联调：用户基础链路、管理员登录、站点准备、车次开售、订单锁座、Mock 支付出票、退票、取消订单和支付失败重试。请按文件夹内的编号顺序执行请求。 新增管理员用户、订单与审计查询。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -2309,7 +2309,7 @@
                 "{{order_id}}"
               ]
             },
-            "description": "确认订单状态、取消时间和关联支付金额。"
+              "description": "确认订单状态、取消时间和关联支付金额。"
           },
           "response": [],
           "event": [
@@ -3348,6 +3348,494 @@
                   "});"
                 ]
               }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 订单超时自动取消",
+      "description": "先运行 A；保持后端运行，等待 payment_deadline 后约 30 秒，再运行 B。不要一次运行整个文件夹。",
+      "item": [
+        {
+          "name": "A 创建并检查",
+          "item": [
+            {
+              "name": "01 记录下单前余票",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "trains",
+                    "{{train_id}}"
+                  ]
+                },
+                "description": "确认车次仍在开售，并记录创建新订单前的余票数。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.environment.unset(\"timeout_train_id\");",
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "var body = pm.response.json();",
+                      "pm.test(\"车次处于开售状态\", function () {",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"train_id\")));",
+                      "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                      "});",
+                      "",
+                      "if (pm.response.code === 200 && body.code === 0 && body.data.status === \"ON_SALE\") {",
+                      "    pm.environment.set(\"timeout_before_first_class_available\", body.data.first_class.available_count);",
+                      "    pm.environment.set(\"timeout_before_second_class_available\", body.data.second_class.available_count);",
+                      "}",
+                      "if (pm.response.code === 200 && body.code === 0 && body.data.status === \"ON_SALE\") { pm.environment.set(\"timeout_train_id\", body.data.id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 创建超时测试订单",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"train_id\": {{timeout_train_id}},\n  \"seat_class\": \"SECOND_CLASS\",\n  \"passengers\": [\n    {\n      \"name\": \"超时测试\",\n      \"id_card\": \"320101200004044567\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/orders",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders"
+                  ]
+                },
+                "description": "在 Body 中填写虚构乘车人。成功后保存独立的超时订单 ID 和 payment_deadline；不要付款或手动取消。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "[\"timeout_order_id\", \"timeout_payment_id\", \"timeout_payment_deadline\"].forEach(function (key) { pm.environment.unset(key); });"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 201\", function () {",
+                      "    pm.response.to.have.status(201);",
+                      "});",
+                      "",
+                      "var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                      "var body = pm.response.json();",
+                      "pm.test(\"新订单进入待支付状态\", function () {",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.payment_id).to.be.a(\"string\").and.not.empty;",
+                      "    pm.expect(body.data.orders).to.have.lengthOf(1);",
+                      "    pm.expect(body.data.orders[0].order_id).to.be.a(\"string\").and.not.empty;",
+                      "    pm.expect(body.data.orders[0].seat_class).to.eql(submitted.seat_class);",
+                      "    pm.expect(body.data.orders[0].status).to.eql(\"WAITING_PAYMENT\");",
+                      "});",
+                      "",
+                      "if (pm.response.code === 201 && body.code === 0 && body.data.orders.length === 1) {",
+                      "    pm.environment.set(\"timeout_order_id\", body.data.orders[0].order_id);",
+                      "    pm.environment.set(\"timeout_payment_id\", body.data.payment_id);\n    pm.environment.set(\"timeout_payment_deadline\", body.data.payment_deadline);",
+                      "    pm.environment.set(\"timeout_ordered_seat_class\", submitted.seat_class);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 确认座位锁定",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/trains/{{timeout_train_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "trains",
+                    "{{timeout_train_id}}"
+                  ]
+                },
+                "description": "确认新订单锁定了所选席别的一个座位。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"所选席别余票减少 1\", function () {",
+                      "    var body = pm.response.json();",
+                      "    var seatClass = pm.environment.get(\"timeout_ordered_seat_class\");",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    if (seatClass === \"FIRST_CLASS\") {",
+                      "        pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"timeout_before_first_class_available\")) - 1);",
+                      "    } else {",
+                      "        pm.expect(seatClass).to.eql(\"SECOND_CLASS\");",
+                      "        pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"timeout_before_second_class_available\")) - 1);",
+                      "    }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 确认未支付并等待截止时间",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/payments/{{timeout_payment_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "payments",
+                    "{{timeout_payment_id}}"
+                  ]
+                },
+                "description": "确认 UNPAID 和 WAITING_PAYMENT。查看响应 payment_deadline，到该时间后再等约 30 秒，执行 B。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"支付单为未支付状态\", function () {",
+                      "    var body = pm.response.json();",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"timeout_payment_id\"));",
+                      "    pm.expect(body.data.status).to.eql(\"UNPAID\");",
+                      "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"timeout_order_id\"); });",
+                      "    pm.expect(order).to.exist;",
+                      "    pm.expect(order.status).to.eql(\"WAITING_PAYMENT\");",
+                      "});",
+                      "pm.test(\"支付截止时间与创建时一致\", function () { pm.expect(pm.response.json().data.payment_deadline).to.eql(pm.environment.get(\"timeout_payment_deadline\")); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "B 到期后验证",
+          "item": [
+            {
+              "name": "01 确认后台自动取消",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/orders/{{timeout_order_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders",
+                    "{{timeout_order_id}}"
+                  ]
+                },
+                "description": "到截止时间后约 30 秒再发送；应为 CANCELLED。不要调用主动取消接口。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"订单状态和取消时间正确\", function () {",
+                      "    var body = pm.response.json();",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"timeout_order_id\"));",
+                      "    pm.expect(body.data.status).to.eql(\"CANCELLED\");",
+                      "    pm.expect(body.data.cancelled_at).to.be.a(\"string\").and.not.empty;",
+                      "    pm.expect(Date.parse(body.data.cancelled_at)).to.be.at.least(Date.parse(pm.environment.get(\"timeout_payment_deadline\")));",
+                      "    pm.expect(body.data.payment.status).to.eql(\"UNPAID\");",
+                      "    pm.expect(Number(body.data.payment.payable_amount)).to.eql(0);",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 确认应付金额归零",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/payments/{{timeout_payment_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "payments",
+                    "{{timeout_payment_id}}"
+                  ]
+                },
+                "description": "确认支付单仍为 UNPAID，并且唯一订单取消后应付金额为 0。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"支付单无需继续付款\", function () {",
+                      "    var body = pm.response.json();",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"timeout_payment_id\"));",
+                      "    pm.expect(body.data.status).to.eql(\"UNPAID\");",
+                      "    pm.expect(Number(body.data.payable_amount)).to.eql(0);",
+                      "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"timeout_order_id\"); });",
+                      "    pm.expect(order).to.exist;",
+                      "    pm.expect(order.status).to.eql(\"CANCELLED\");",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 确认座位恢复可售",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/trains/{{timeout_train_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "trains",
+                    "{{timeout_train_id}}"
+                  ]
+                },
+                "description": "确认取消订单释放座位后，余票恢复到本阶段下单前数量。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 状态码为 200\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test(\"锁定座位已经重新可售\", function () {",
+                      "    var body = pm.response.json();",
+                      "    pm.expect(body.code).to.eql(0);",
+                      "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                      "    pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"timeout_before_first_class_available\")));",
+                      "    pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"timeout_before_second_class_available\")));",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 确认超时后不能支付",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/payments/{{timeout_payment_id}}/pay",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "payments",
+                    "{{timeout_payment_id}}",
+                    "pay"
+                  ]
+                },
+                "description": "预期拒绝支付，HTTP 409 和 code 44002 表示测试通过。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"预期业务拒绝：HTTP 409\", function () { pm.response.to.have.status(409); });",
+                      "pm.test(\"业务错误码符合预期\", function () { pm.expect(pm.response.json().code).to.eql(44002); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 确认没有电子票",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{user_token}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/tickets/{{timeout_order_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "tickets",
+                    "{{timeout_order_id}}"
+                  ]
+                },
+                "description": "订单未出票，预期 HTTP 409 和 code 45001。"
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"预期业务拒绝：HTTP 409\", function () { pm.response.to.have.status(409); });",
+                      "pm.test(\"业务错误码符合预期\", function () { pm.expect(pm.response.json().code).to.eql(45001); });"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         }
