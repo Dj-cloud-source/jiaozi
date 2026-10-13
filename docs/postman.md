@@ -335,6 +335,26 @@ GET  /api/v1/tickets/{order_id}
 
 ---
 
+第十一阶段对应 `12 管理员修改与停用站点`，共 7 个请求：
+
+```text
+创建独立测试站点（ACTIVE）
+→ 公开列表确认可见
+→ 修改站点名称
+→ 公开列表确认新名称和原 ID
+→ 停用站点（DISABLED）
+→ 公开列表确认不再可见
+→ 管理员列表确认仍保留停用记录
+```
+
+执行前运行 `03 管理员与站点 / 01 管理员登录`。本阶段无需用户登录、车次或订单。创建和修改请求的 Body 分别填写测试名称，默认是 `联调维护站01` 和 `联调维护站01改名`。后端会去掉名称两端空格。
+
+创建成功自动保存 `maintenance_station_id`、`maintenance_station_name`；修改成功更新该名称变量。只使用本阶段独立 ID，不覆盖原来的出发站和到达站变量。请勿将测试站点用于创建车次。遇到失败先停下处理，再继续后续请求。
+
+重复整组测试时，创建和修改 Body 都换一组未使用的名称（例如 02）。停用并非删除，停用站点的名称仍受唯一约束；重名会返回 HTTP 409 / code 42004。不要重复执行停用请求，已停用站点再次停用会返回 HTTP 409 / code 42007。
+
+对应接口：`POST /api/v1/admin/stations`、`PATCH /api/v1/admin/stations/{station_id}`、`POST /api/v1/admin/stations/{station_id}/disable`、`GET /api/v1/stations`、`GET /api/v1/admin/stations`。创建、修改、停用操作会分别产生 CREATE_STATION、UPDATE_STATION、DISABLE_STATION 审计日志，可用第 10 组查看。
+
 # 4. 第二阶段前置条件
 
 管理员不能通过 HTTP 接口注册，需要先在 VMware Linux 中初始化一次：
@@ -407,6 +427,8 @@ admin_query_user_id
 user_nickname
 user_token
 admin_token
+maintenance_station_id
+maintenance_station_name
 departure_station_name
 arrival_station_name
 departure_station_id
@@ -547,7 +569,7 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-管理员站点与车次维护
+管理员草稿车次修改与归档
 ```
 
 每次只扩展一个小阶段，并在 Windows VM 中实际验证后再继续。

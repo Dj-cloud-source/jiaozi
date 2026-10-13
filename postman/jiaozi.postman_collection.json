@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-10",
-    "description": "第一至八阶段联调：用户基础链路、管理员登录、站点准备、车次开售、订单锁座、Mock 支付出票、退票、取消订单和支付失败重试。请按文件夹内的编号顺序执行请求。 新增管理员用户、订单与审计查询。",
+    "name": "Jiaozi API - Phase 1-11",
+    "description": "票务 API 分阶段联调：用户、站点、车次、订单、支付、退票、超时取消及管理员查询和站点维护。按各文件夹说明和编号执行。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -3836,6 +3836,385 @@
                   }
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 管理员修改与停用站点",
+      "description": "先刷新管理员登录，依次执行。创建和修改名称直接填 Body；重复整组测试时两个名称都换新。",
+      "item": [
+        {
+          "name": "01 创建独立测试站点",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"联调维护站01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations"
+              ]
+            },
+            "description": "创建专用站点并保存独立 ID。请使用未注册的名称，成功后再继续。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.unset(\"maintenance_station_id\");",
+                  "pm.environment.unset(\"maintenance_station_name\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "    pm.expect(body.data.id).to.be.a(\"number\").and.above(0);",
+                  "    pm.expect(body.data.name).to.eql(submitted.name.trim());",
+                  "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
+                  "    if (pm.response.code === 201) {",
+                  "        pm.environment.set(\"maintenance_station_id\", body.data.id);",
+                  "        pm.environment.set(\"maintenance_station_name\", body.data.name);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 确认公开列表可见",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stations"
+              ]
+            },
+            "description": "通过独立 ID 找到新创建的站点。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var station = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"maintenance_station_id\")); });",
+                  "    pm.expect(station, \"列表应包含本次测试站点\").to.exist;",
+                  "    pm.expect(station.name).to.eql(pm.environment.get(\"maintenance_station_name\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 修改站点名称",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"联调维护站01改名\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations/{{maintenance_station_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations",
+                "{{maintenance_station_id}}"
+              ]
+            },
+            "description": "直接修改 Body 的 name；新名称须未被占用。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    var submitted = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"maintenance_station_id\")));",
+                  "    pm.expect(body.data.name).to.eql(submitted.name.trim());",
+                  "    pm.expect(body.data.status).to.eql(\"ACTIVE\");",
+                  "    if (pm.response.code === 200) { pm.environment.set(\"maintenance_station_name\", body.data.name); }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 确认公开列表名称更新",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stations"
+              ]
+            },
+            "description": "同一个站点 ID 应显示修改后的名称。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var station = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"maintenance_station_id\")); });",
+                  "    pm.expect(station, \"列表应包含本次测试站点\").to.exist;",
+                  "    pm.expect(station.name).to.eql(pm.environment.get(\"maintenance_station_name\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 停用测试站点",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations/{{maintenance_station_id}}/disable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations",
+                "{{maintenance_station_id}}",
+                "disable"
+              ]
+            },
+            "description": "仅停用本阶段创建的独立测试站点，不要重复点击。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.id).to.eql(Number(pm.environment.get(\"maintenance_station_id\")));",
+                  "    pm.expect(body.data.name).to.eql(pm.environment.get(\"maintenance_station_name\"));",
+                  "    pm.expect(body.data.status).to.eql(\"DISABLED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 确认公开列表不再显示",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "stations"
+              ]
+            },
+            "description": "停用后公开列表应排除该站点，其他站点不受影响。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var station = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"maintenance_station_id\")); });",
+                  "    pm.expect(station, \"公开列表不应返回停用站点\").to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 确认管理员保留停用记录",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/stations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "stations"
+              ]
+            },
+            "description": "管理员列表仍能查到同一站点 ID、新名称和 DISABLED 状态。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"站点结果符合预期\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data).to.be.an(\"array\");",
+                  "    var station = body.data.find(function (item) { return item.id === Number(pm.environment.get(\"maintenance_station_id\")); });",
+                  "    pm.expect(station, \"列表应包含本次测试站点\").to.exist;",
+                  "    pm.expect(station.name).to.eql(pm.environment.get(\"maintenance_station_name\"));",
+                  "    pm.expect(station.status).to.eql(\"DISABLED\");",
+                  "});"
+                ]
+              }
             }
           ]
         }
