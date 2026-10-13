@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "0a5483e0-bb22-4d42-8fd6-a424331d7130",
-    "name": "Jiaozi API - Phase 1-5",
-    "description": "第一至五阶段联调：用户基础链路、管理员登录、站点准备、车次开售、创建订单锁座和 Mock 支付出票。请按文件夹内的编号顺序执行请求。",
+    "name": "Jiaozi API - Phase 1-6",
+    "description": "第一至六阶段联调：用户基础链路、管理员登录、站点准备、车次开售、创建订单锁座、Mock 支付出票和已出票订单退票。请按文件夹内的编号顺序执行请求。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1738,6 +1738,319 @@
                   "    pm.expect(body.data.ticketed_at).to.be.a(\"string\").and.not.empty;",
                   "    pm.expect(body.data.seat.class).to.eql(pm.environment.get(\"ordered_seat_class\"));",
                   "    pm.expect(body.data.seat.number).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 已出票订单退票",
+      "description": "直接使用上一阶段成功出票的订单。退票必须发生在发车前 10 分钟以前，并按顺序检查订单、支付单、电子票和余票。",
+      "item": [
+        {
+          "name": "01 确认订单可以退票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "description": "退票前确认订单仍为 TICKETED，且关联支付单已经成功。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"订单满足退票状态条件\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"TICKETED\");",
+                  "    pm.expect(body.data.payment.status).to.eql(\"SUCCESS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 发起退票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders/{{order_id}}/return",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{order_id}}",
+                "return"
+              ]
+            },
+            "description": "将已出票订单更新为 RETURNED，同时释放座位并记录退款金额。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"退票请求处理成功\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"RETURNED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 确认订单已退票",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "description": "确认订单已经变成 RETURNED，并记录了退票时间。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"订单状态和退票时间正确\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"RETURNED\");",
+                  "    pm.expect(body.data.returned_at).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.data.payment.status).to.eql(\"SUCCESS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 确认退款金额",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{payment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{payment_id}}"
+              ]
+            },
+            "description": "当前 Mock 实现保持 Payment 为 SUCCESS，并把单张票的金额累计到 refunded_amount。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"支付单记录了全额退款\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.payment_id).to.eql(pm.environment.get(\"payment_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"SUCCESS\");",
+                  "    pm.expect(body.data.refunded_amount).to.eql(body.data.original_amount);",
+                  "    var order = body.data.orders.find(function (item) { return item.order_id === pm.environment.get(\"order_id\"); });",
+                  "    pm.expect(order).to.exist;",
+                  "    pm.expect(order.status).to.eql(\"RETURNED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 确认电子票已失效",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tickets/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tickets",
+                "{{order_id}}"
+              ]
+            },
+            "description": "退票后的电子票仍可作为历史记录查询，但不再有效。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"电子票保留但已经失效\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.order_id).to.eql(pm.environment.get(\"order_id\"));",
+                  "    pm.expect(body.data.status).to.eql(\"RETURNED\");",
+                  "    pm.expect(body.data.valid).to.eql(false);",
+                  "    pm.expect(body.data.ticketed_at).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 确认座位重新可售",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/trains/{{train_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "trains",
+                "{{train_id}}"
+              ]
+            },
+            "description": "确认退票释放座位后，两种席别的余票恢复到下单前数量。"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 状态码为 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"退票座位已重新变为可售\", function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.code).to.eql(0);",
+                  "    pm.expect(body.data.status).to.eql(\"ON_SALE\");",
+                  "    pm.expect(body.data.first_class.available_count).to.eql(Number(pm.environment.get(\"before_first_class_available\")));",
+                  "    pm.expect(body.data.second_class.available_count).to.eql(Number(pm.environment.get(\"before_second_class_available\")));",
                   "});"
                 ]
               }

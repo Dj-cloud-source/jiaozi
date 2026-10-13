@@ -198,6 +198,36 @@ GET  /api/v1/tickets/{order_id}
 
 第五阶段依赖第四阶段刚刚创建的 `payment_id` 和 `order_id`，并且必须在 10 分钟支付截止时间内开始执行。Mock 成功接口只用于本地开发联调，不代表真实支付渠道。
 
+第六阶段验证已出票订单退票和电子票失效：
+
+```text
+确认订单为 TICKETED
+↓
+用户发起退票
+TicketOrder: TICKETED → RETURNED
+Seat: SOLD → AVAILABLE
+↓
+查询订单和支付单
+↓
+查询历史电子票，确认 valid = false
+↓
+查询车次，确认对应席别余票恢复
+```
+
+对应接口：
+
+```text
+GET  /api/v1/orders/{order_id}
+POST /api/v1/orders/{order_id}/return
+GET  /api/v1/payments/{payment_id}
+GET  /api/v1/tickets/{order_id}
+GET  /api/v1/trains/{train_id}
+```
+
+第六阶段直接使用第五阶段成功出票的 `order_id`、`payment_id` 和原车次变量。退票必须发生在发车前 10 分钟以前。
+
+当前后端的 Mock 退款实现比 `api.md` 中的目标响应简单：退票接口实际返回 `data.status = RETURNED`；Payment 暂时保持 `SUCCESS`，并将票价累计到 `refunded_amount`。当前代码尚未实现 `REFUNDING → REFUNDED` 的异步资金退款状态流转，Postman 按当前真实行为验证。
+
 ---
 
 # 4. 第二阶段前置条件
@@ -404,7 +434,9 @@ HTTP 状态码符合预期
 完整业务链按照以下顺序逐步加入：
 
 ```text
-取消待支付订单 / 退票
+取消待支付订单
+↓
+支付失败与重新支付
 ```
 
 每次只扩展一个小阶段，并在 Windows VM 中实际验证后再继续。
